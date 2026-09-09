@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Users,
   Star,
@@ -12,17 +12,17 @@ import {
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { Avatar } from '../components/common/Avatar';
-import { useAppDispatch, useAppSelector } from '../store';
-import {
-  setSelectedTopic,
-  setOnlineOnly,
-} from '../store/slices/mentorSlice';
+import { Mentor } from '../types';
+import { mentorService } from '../services/mentorService';
 
 export const MentorshipPage: React.FC = () => {
-  const dispatch = useAppDispatch();
-  const mentors = useAppSelector((state) => state.mentors.mentors);
-  const selectedTopic = useAppSelector((state) => state.mentors.selectedTopic);
-  const onlineOnly = useAppSelector((state) => state.mentors.onlineOnly);
+  const [mentors, setMentors] = useState<Mentor[]>([]);
+  const [selectedTopic, setSelectedTopic] = useState('ALL');
+  const [onlineOnly, setOnlineOnly] = useState(false);
+
+  useEffect(() => {
+    mentorService.getAll().then(setMentors).catch(console.error);
+  }, []);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [connectModalMentor, setConnectModalMentor] = useState<string | null>(null);
@@ -48,9 +48,7 @@ export const MentorshipPage: React.FC = () => {
     const matchesTopic =
       selectedTopic === 'ALL'
         ? true
-        : m.specializations.some((s) =>
-            s.toLowerCase().includes(selectedTopic.toLowerCase())
-          );
+        : m.specializations.some((s) => s.toLowerCase().includes(selectedTopic.toLowerCase()));
     return matchesSearch && matchesOnline && matchesTopic;
   });
 
@@ -107,7 +105,7 @@ export const MentorshipPage: React.FC = () => {
             <input
               type="checkbox"
               checked={onlineOnly}
-              onChange={(e) => dispatch(setOnlineOnly(e.target.checked))}
+              onChange={(e) => setOnlineOnly(e.target.checked)}
               className="rounded bg-slate-950 border-slate-700 text-purple-600 focus:ring-purple-500"
             />
             <span className="flex items-center gap-1.5">
@@ -122,7 +120,7 @@ export const MentorshipPage: React.FC = () => {
           {topics.map((topic) => (
             <button
               key={topic}
-              onClick={() => dispatch(setSelectedTopic(topic))}
+              onClick={() => setSelectedTopic(topic)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition ${
                 selectedTopic === topic
                   ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BookOpen,
   Search,
@@ -10,29 +10,25 @@ import {
   ArrowUpRight,
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
-import { MOCK_KNOWLEDGE_VAULT } from '../constants/mockData';
+import { KnowledgeItem } from '../types';
+import { knowledgeService } from '../services/knowledgeService';
 
 export const KnowledgeVaultPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [filteredItems, setFilteredItems] = useState<KnowledgeItem[]>([]);
 
-  const categories = [
-    'ALL',
-    'Database Systems',
-    'Operating Systems',
-    'Artificial Intelligence',
-    'Algorithms',
-  ];
+  const categories = ['ALL', 'Database Systems', 'Operating Systems', 'Artificial Intelligence', 'Algorithms'];
 
-  const filteredItems = MOCK_KNOWLEDGE_VAULT.filter((item) => {
-    const matchesSearch =
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.snippet.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.tags.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesCat =
-      selectedCategory === 'ALL' ? true : item.category === selectedCategory;
-    return matchesSearch && matchesCat;
-  });
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      knowledgeService
+        .getAll({ search: searchQuery || undefined, category: selectedCategory })
+        .then(setFilteredItems)
+        .catch(console.error);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, selectedCategory]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">

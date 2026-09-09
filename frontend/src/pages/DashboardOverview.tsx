@@ -9,6 +9,7 @@ import { useAppSelector } from '../store';
 
 export const DashboardOverview: React.FC = () => {
   const user = useAppSelector((state) => state.auth.user);
+  if (!user) return null;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">

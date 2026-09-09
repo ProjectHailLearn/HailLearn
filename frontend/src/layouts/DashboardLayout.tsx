@@ -15,6 +15,7 @@ import {
   PlusCircle,
   Cpu,
   Shield,
+  LogOut,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store';
 import {
@@ -22,7 +23,7 @@ import {
   setCommandPaletteOpen,
   toggleNotificationDrawer,
 } from '../store/slices/uiSlice';
-import { setUserRole } from '../store/slices/authSlice';
+import { setUserRole, logout } from '../store/slices/authSlice';
 import { UserRole } from '../types';
 import { Avatar } from '../components/common/Avatar';
 import { Button } from '../components/common/Button';
@@ -35,6 +36,7 @@ export const DashboardLayout: React.FC = () => {
   const navigate = useNavigate();
   const isSidebarCollapsed = useAppSelector((state) => state.ui.isSidebarCollapsed);
   const user = useAppSelector((state) => state.auth.user);
+  const handleLogout = () => { dispatch(logout()); navigate('/login'); };
   const unreadNotifCount = useAppSelector(
     (state) => state.ui.notifications.filter((n) => !n.read).length
   );
@@ -205,18 +207,23 @@ export const DashboardLayout: React.FC = () => {
 
           {/* User Profile Mini Bar */}
           <div className="p-3 border-t border-slate-800/80 flex items-center gap-3">
-            <Avatar src={user.avatar} name={user.name} size="sm" isOnline={true} />
+            <Avatar src={user?.avatar || ''} name={user?.name || 'User'} size="sm" isOnline={true} />
             {!isSidebarCollapsed && (
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-semibold text-slate-200 truncate">
-                  {user.name}
-                </div>
+                <div className="text-xs font-semibold text-slate-200 truncate">{user?.name}</div>
                 <div className="flex items-center gap-1 text-[11px] text-amber-400">
                   <Flame className="w-3 h-3 fill-amber-400" />
-                  <span>{user.karmaPoints} Karma</span>
+                  <span>{user?.karmaPoints ?? 0} Karma</span>
                 </div>
               </div>
             )}
+            <button
+              onClick={handleLogout}
+              className="p-1.5 text-slate-400 hover:text-red-400 rounded-lg hover:bg-slate-800 transition flex-shrink-0"
+              title="Sign out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </aside>
 
@@ -241,7 +248,7 @@ export const DashboardLayout: React.FC = () => {
 
               <div className="hidden lg:flex items-center gap-2 text-xs font-medium text-slate-400 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-800">
                 <Shield className="w-3.5 h-3.5 text-brand-400" />
-                <span className="truncate">{user.university}</span>
+                <span className="truncate">{user?.university}</span>
               </div>
             </div>
 
@@ -286,10 +293,10 @@ export const DashboardLayout: React.FC = () => {
 
               {/* User Avatar with Karma pill */}
               <div className="flex items-center gap-2 pl-2 border-l border-slate-800">
-                <Avatar src={user.avatar} name={user.name} size="sm" isOnline={true} />
+                <Avatar src={user?.avatar || ''} name={user?.name || 'User'} size="sm" isOnline={true} />
                 <div className="hidden sm:block text-left">
-                  <div className="text-xs font-semibold text-slate-100">{user.name}</div>
-                  <div className="text-[10px] text-slate-400">{user.department}</div>
+                  <div className="text-xs font-semibold text-slate-100">{user?.name}</div>
+                  <div className="text-[10px] text-slate-400">{user?.department}</div>
                 </div>
               </div>
             </div>
