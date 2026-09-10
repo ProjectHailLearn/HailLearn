@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GraduationCap, Sparkles, Eye, EyeOff, Flame, BookOpen, Users } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store';
@@ -13,6 +13,8 @@ export const LoginPage: React.FC = () => {
 
   const [mode, setMode] = useState<Mode>('login');
   const [showPassword, setShowPassword] = useState(false);
+  const [ripples, setRipples] = useState<{ id: number; x: number; y: number }[]>([]);
+  const btnRef = useRef<HTMLButtonElement>(null);
   const [form, setForm] = useState({
     name: '', email: '', password: '',
     university: 'HailLearn University',
@@ -48,6 +50,14 @@ export const LoginPage: React.FC = () => {
   };
 
   const switchMode = (m: Mode) => { setMode(m); dispatch(clearError()); };
+
+  const handleButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (isLoading) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const id = Date.now();
+    setRipples((prev) => [...prev, { id, x: e.clientX - rect.left, y: e.clientY - rect.top }]);
+    setTimeout(() => setRipples((prev) => prev.filter((r) => r.id !== id)), 600);
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 relative overflow-hidden">
@@ -89,7 +99,7 @@ export const LoginPage: React.FC = () => {
               <button
                 key={m}
                 onClick={() => switchMode(m)}
-                className={`flex-1 py-3.5 text-sm font-semibold transition capitalize ${
+                className={`flex-1 py-3.5 text-sm font-semibold transition-all duration-150 capitalize active:scale-95 ${
                   mode === m
                     ? 'text-white border-b-2 border-brand-500 bg-brand-600/5'
                     : 'text-slate-400 hover:text-slate-200'
@@ -216,18 +226,38 @@ export const LoginPage: React.FC = () => {
             )}
 
             <button
+              ref={btnRef}
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white text-sm font-bold shadow-lg shadow-brand-600/20 transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+              onClick={handleButtonClick}
+              className="relative w-full py-3 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white text-sm font-bold shadow-lg shadow-brand-600/20 transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed overflow-hidden active:scale-[0.97] active:shadow-none"
+              style={{ transform: 'translateZ(0)' }}
             >
+              {/* Ripple effects */}
+              {ripples.map((r) => (
+                <span
+                  key={r.id}
+                  className="ripple pointer-events-none absolute rounded-full bg-white/30"
+                  style={{
+                    left: r.x - 40,
+                    top: r.y - 40,
+                    width: 80,
+                    height: 80,
+                  }}
+                />
+              ))}
+              {/* Shimmer sweep on hover */}
+              <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-700 hover:translate-x-full" />
               {isLoading ? (
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
-                <Sparkles className="w-4 h-4" />
+                <Sparkles className="w-4 h-4 transition-transform duration-200 group-hover:rotate-12" />
               )}
-              {isLoading
-                ? mode === 'login' ? 'Signing in...' : 'Creating account...'
-                : mode === 'login' ? 'Sign In to HailLearn' : 'Create Account'}
+              <span className="relative">
+                {isLoading
+                  ? mode === 'login' ? 'Signing in...' : 'Creating account...'
+                  : mode === 'login' ? 'Sign In to HailLearn' : 'Create Account'}
+              </span>
             </button>
           </form>
         </div>
