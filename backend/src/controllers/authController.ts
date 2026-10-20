@@ -8,7 +8,7 @@ import { AuthRequest } from '../middlewares/auth.js';
 import { notify } from '../services/notificationService.js';
 
 const signToken = (userId: string, role: string): string =>
-  jwt.sign({ userId, role }, process.env.JWT_SECRET!, {
+  jwt.sign({ userId, role }, process.env.JWT_SECRET || 'dev_haillearn_jwt_secret_key_2026_super_secure', {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   } as jwt.SignOptions);
 
@@ -76,7 +76,9 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     res.status(201).json({ success: true, data: { token, user: toPublicUser(user) } });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Registration failed', error: (err as Error).message });
+    const errorMsg = (err as Error).message;
+    console.error('[Register Error]', err);
+    res.status(500).json({ success: false, message: `Registration failed: ${errorMsg}`, error: errorMsg });
   }
 };
 
@@ -97,7 +99,9 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     const token = signToken(user._id.toString(), user.role);
     res.json({ success: true, data: { token, user: toPublicUser(user) } });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Login failed', error: (err as Error).message });
+    const errorMsg = (err as Error).message;
+    console.error('[Login Error]', err);
+    res.status(500).json({ success: false, message: `Login failed: ${errorMsg}`, error: errorMsg });
   }
 };
 

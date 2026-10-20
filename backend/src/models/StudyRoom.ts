@@ -25,4 +25,4 @@ const StudyRoomSchema = new Schema<IStudyRoom>(
   { timestamps: true }
 );
 
-export const StudyRoom = mongoose.model<IStudyRoom>('StudyRoom', StudyRoomSchema);
+export const StudyRoom = mongoose.models.StudyRoom || mongoose.model<IStudyRoom>('StudyRoom', StudyRoomSchema);

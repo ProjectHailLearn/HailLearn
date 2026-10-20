@@ -15,7 +15,7 @@ export const protect = (req: AuthRequest, res: Response, next: NextFunction): vo
 
   try {
     const token = auth.replace('Bearer ', '');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string; role: string };
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev_haillearn_jwt_secret_key_2026_super_secure') as { userId: string; role: string };
     req.userId = decoded.userId;
     req.userRole = decoded.role;
     next();

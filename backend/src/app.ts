@@ -103,3 +103,8 @@ export const createApp = (): Express => {
 
 const app: Express = createApp();
 export default app;
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = Object.assign(app, { default: app, createApp });
+}
+

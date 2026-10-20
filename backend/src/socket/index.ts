@@ -36,7 +36,7 @@ export const initSocket = (server: http.Server): Server => {
     try {
       const token = socket.handshake.auth?.token as string | undefined;
       if (!token) return next(new Error('No token'));
-      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev_haillearn_jwt_secret_key_2026_super_secure') as { userId: string };
       socket.data.userId = decoded.userId;
       next();
     } catch {

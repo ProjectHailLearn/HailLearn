@@ -76,4 +76,4 @@ const DoubtSchema = new Schema<IDoubt>(
   { timestamps: true }
 );
 
-export const Doubt = mongoose.model<IDoubt>('Doubt', DoubtSchema);
+export const Doubt = mongoose.models.Doubt || mongoose.model<IDoubt>('Doubt', DoubtSchema);

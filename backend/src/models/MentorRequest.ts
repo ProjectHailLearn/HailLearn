@@ -28,4 +28,4 @@ const MentorRequestSchema = new Schema<IMentorRequest>(
   { timestamps: true }
 );
 
-export const MentorRequest = mongoose.model<IMentorRequest>('MentorRequest', MentorRequestSchema);
+export const MentorRequest = mongoose.models.MentorRequest || mongoose.model<IMentorRequest>('MentorRequest', MentorRequestSchema);

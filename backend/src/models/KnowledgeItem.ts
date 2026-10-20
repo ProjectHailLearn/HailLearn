@@ -31,4 +31,4 @@ const KnowledgeItemSchema = new Schema<IKnowledgeItem>(
   { timestamps: true }
 );
 
-export const KnowledgeItem = mongoose.model<IKnowledgeItem>('KnowledgeItem', KnowledgeItemSchema);
+export const KnowledgeItem = mongoose.models.KnowledgeItem || mongoose.model<IKnowledgeItem>('KnowledgeItem', KnowledgeItemSchema);

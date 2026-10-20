@@ -33,4 +33,4 @@ const MentorSchema = new Schema<IMentor>(
   { timestamps: true }
 );
 
-export const Mentor = mongoose.model<IMentor>('Mentor', MentorSchema);
+export const Mentor = mongoose.models.Mentor || mongoose.model<IMentor>('Mentor', MentorSchema);
