@@ -96,7 +96,24 @@ export interface DashboardStats {
   knowledgeItems: number;
   myDoubts: number;
   karmaPoints: number;
+  karmaRank: number;
+  totalUsers: number;
   doubtsByCourse: Record<string, number>;
+}
+
+export interface StudyRoom {
+  id: string;
+  title: string;
+  courseCode: string;
+  hostId: string;
+  hostName: string;
+  scheduledAt: string;
+  durationMins: number;
+  meetingLink?: string;
+  attendees: number;
+  isAttending: boolean;
+  isHost: boolean;
+  status: 'LIVE' | 'UPCOMING';
 }
 
 export interface Mentor {
@@ -127,12 +144,17 @@ export interface KnowledgeItem {
   tags: string[];
   snippet: string;
   similarityScore?: number;
+  hasUpvoted?: boolean;
 }
 
 export interface Course {
   id: string;
   code: string;
   title: string;
+  subject: string;
+  isEnrolled: boolean;
+  myDoubts: number;
+  myResolved: number;
   instructor: string;
   credits: number;
   progress: number;

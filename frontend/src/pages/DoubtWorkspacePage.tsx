@@ -21,7 +21,8 @@ import { useAppSelector } from '../store';
 import { Doubt } from '../types';
 import { doubtService } from '../services/doubtService';
 import { mentorService } from '../services/mentorService';
-import { Mentor } from '../types';
+import { courseService } from '../services/courseService';
+import { Mentor, Course, DoubtStatus } from '../types';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 
 const errorMessage = (err: unknown, fallback: string): string =>
@@ -40,6 +41,12 @@ export const DoubtWorkspacePage: React.FC = () => {
   const [courseCode, setCourseCode] = useState('CS201');
   const [subject, setSubject] = useState('Data Structures & Algorithms');
   const [isSolving, setIsSolving] = useState(false);
+  const [depth, setDepth] = useState<'detailed' | 'concise' | 'socratic'>('detailed');
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [archiveSearch, setArchiveSearch] = useState('');
+  const [archiveCourse, setArchiveCourse] = useState('ALL');
+  const [archiveStatus, setArchiveStatus] = useState<'ALL' | DoubtStatus>('ALL');
+  const [mineOnly, setMineOnly] = useState(false);
   const [selectedMentorForEscalation, setSelectedMentorForEscalation] = useState('');
   const [answerText, setAnswerText] = useState('');
   const [isAnswering, setIsAnswering] = useState(false);
@@ -50,16 +57,42 @@ export const DoubtWorkspacePage: React.FC = () => {
   const canVerify = user?.role === 'faculty' || user?.role === 'admin';
 
   useEffect(() => {
+    courseService.getAll().then((c) => {
+      setCourses(c);
+      const requested = searchParams.get('course');
+      const match = c.find((x) => x.code === requested) || c[0];
+      if (match) {
+        setCourseCode(match.code);
+        setSubject(match.subject);
+      }
+      if (requested) setArchiveCourse(requested);
+    }).catch(console.error);
+  }, [searchParams]);
+
+  useEffect(() => {
     const requestedId = searchParams.get('id');
     doubtService.getAll().then((d) => {
       setDoubts(d);
       if (requestedId && d.some((x) => x.id === requestedId)) setActiveDoubtId(requestedId);
       else if (d.length > 0) setActiveDoubtId(d[0].id);
     }).catch((err) => setError(errorMessage(err, 'Failed to load doubts')));
+  }, [searchParams]);
+
+  useEffect(() => {
     mentorService.getAll().then(setMentors).catch(console.error);
   }, []);
 
   const activeDoubt = doubts.find((d) => d.id === activeDoubtId) || doubts[0];
+
+  const archive = doubts.filter((d) => {
+    const q = archiveSearch.trim().toLowerCase();
+    return (
+      (archiveCourse === 'ALL' || d.courseCode === archiveCourse) &&
+      (archiveStatus === 'ALL' || d.status === archiveStatus) &&
+      (!mineOnly || d.author.id === user?.id) &&
+      (!q || d.title.toLowerCase().includes(q) || d.tags.some((t) => t.toLowerCase().includes(q)))
+    );
+  });
 
   const handleCreateDoubt = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,6 +108,7 @@ export const DoubtWorkspacePage: React.FC = () => {
         subject,
         courseCode,
         tags: [subject.split(' ')[0], courseCode],
+        depth,
       });
       setDoubts((prev) => [newDoubt, ...prev]);
       setActiveDoubtId(newDoubt.id);
@@ -178,28 +212,25 @@ export const DoubtWorkspacePage: React.FC = () => {
                     value={courseCode}
                     onChange={(e) => {
                       setCourseCode(e.target.value);
-                      const map: Record<string, string> = {
-                        CS201: 'Data Structures & Algorithms',
-                        CS305: 'Distributed Systems',
-                        AI401: 'Deep Learning & LLMs',
-                        CS245: 'Database Architecture',
-                      };
-                      setSubject(map[e.target.value] || 'Computer Science');
+                      setSubject(courses.find((c) => c.code === e.target.value)?.subject || 'Computer Science');
                     }}
                     className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-brand-500"
                   >
-                    <option value="CS201">CS201: Algorithms</option>
-                    <option value="CS305">CS305: Distributed Systems</option>
-                    <option value="AI401">AI401: Deep Learning</option>
-                    <option value="CS245">CS245: Databases</option>
+                    {courses.map((c) => (
+                      <option key={c.code} value={c.code}>{c.code}: {c.subject}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">AI Reasoning Depth</label>
-                  <select className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-brand-500">
-                    <option>Exhaustive Step-by-Step</option>
-                    <option>Concise Summary</option>
-                    <option>Socratic Hint Mode</option>
+                  <select
+                    value={depth}
+                    onChange={(e) => setDepth(e.target.value as typeof depth)}
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-brand-500"
+                  >
+                    <option value="detailed">Exhaustive Step-by-Step</option>
+                    <option value="concise">Concise Summary</option>
+                    <option value="socratic">Socratic Hint Mode</option>
                   </select>
                 </div>
               </div>
@@ -249,8 +280,45 @@ export const DoubtWorkspacePage: React.FC = () => {
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-1">
               Select Question From Archive
             </h3>
+            <div className="space-y-2 mb-3">
+              <input
+                type="text"
+                value={archiveSearch}
+                onChange={(e) => setArchiveSearch(e.target.value)}
+                placeholder="Search questions or tags..."
+                className="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-brand-500"
+              />
+              <div className="flex gap-2">
+                <select
+                  value={archiveCourse}
+                  onChange={(e) => setArchiveCourse(e.target.value)}
+                  className="flex-1 bg-slate-950 border border-slate-700/80 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none"
+                >
+                  <option value="ALL">All courses</option>
+                  {courses.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
+                </select>
+                <select
+                  value={archiveStatus}
+                  onChange={(e) => setArchiveStatus(e.target.value as typeof archiveStatus)}
+                  className="flex-1 bg-slate-950 border border-slate-700/80 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none"
+                >
+                  <option value="ALL">All statuses</option>
+                  <option value="AI_RESOLVED">AI Resolved</option>
+                  <option value="MENTOR_ESCALATED">In Mentorship</option>
+                  <option value="FACULTY_VERIFIED">Verified</option>
+                  <option value="CLOSED">Closed</option>
+                </select>
+                <label className="flex items-center gap-1 text-xs text-slate-400 whitespace-nowrap">
+                  <input type="checkbox" checked={mineOnly} onChange={(e) => setMineOnly(e.target.checked)} />
+                  Mine
+                </label>
+              </div>
+            </div>
             <div className="space-y-2 max-h-72 overflow-y-auto">
-              {doubts.map((d) => (
+              {archive.length === 0 && (
+                <div className="text-xs text-slate-500 text-center py-4">No questions match these filters.</div>
+              )}
+              {archive.map((d) => (
                 <button
                   key={d.id}
                   onClick={() => setActiveDoubtId(d.id)}

@@ -6,18 +6,36 @@ import {
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
-import { MOCK_COURSES } from '../constants/mockData';
 import { useNavigate } from 'react-router-dom';
-import { statsService } from '../services/statsService';
+import { courseService } from '../services/courseService';
+import { Course } from '../types';
 
 export const CoursesPage: React.FC = () => {
   const navigate = useNavigate();
-  // Course catalog is static for now; open-doubt counts are live from the API.
-  const [openByCourse, setOpenByCourse] = useState<Record<string, number> | null>(null);
+  const [courses, setCourses] = useState<Course[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<'ALL' | 'ENROLLED'>('ALL');
 
   useEffect(() => {
-    statsService.get().then((s) => setOpenByCourse(s.doubtsByCourse)).catch(console.error);
+    courseService.getAll().then(setCourses).catch(() => setError('Failed to load courses'));
   }, []);
+
+  const handleEnroll = async (course: Course) => {
+    try {
+      const isEnrolled = await courseService.toggleEnroll(course.id);
+      setCourses((prev) =>
+        prev?.map((c) =>
+          c.id === course.id
+            ? { ...c, isEnrolled, enrolledStudents: c.enrolledStudents + (isEnrolled ? 1 : -1) }
+            : c
+        ) ?? null
+      );
+    } catch {
+      setError('Failed to update enrollment');
+    }
+  };
+
+  const visible = (courses || []).filter((c) => view === 'ALL' || c.isEnrolled);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -34,9 +52,31 @@ export const CoursesPage: React.FC = () => {
         </div>
       </div>
 
+      <div className="flex items-center gap-2">
+        {(['ALL', 'ENROLLED'] as const).map((v) => (
+          <button
+            key={v}
+            onClick={() => setView(v)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+              view === v
+                ? 'bg-brand-600/20 border-brand-500/40 text-brand-300'
+                : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {v === 'ALL' ? 'All Courses' : 'My Courses'}
+          </button>
+        ))}
+      </div>
+
+      {error && <div className="text-xs text-rose-400">{error}</div>}
+      {courses === null && !error && <div className="text-xs text-slate-500">Loading courses…</div>}
+      {courses !== null && visible.length === 0 && (
+        <div className="text-xs text-slate-500">You haven't enrolled in any courses yet.</div>
+      )}
+
       {/* Courses Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {MOCK_COURSES.map((course) => (
+        {visible.map((course) => (
           <Card
             key={course.id}
             variant="glass"
@@ -58,7 +98,7 @@ export const CoursesPage: React.FC = () => {
 
               <div className="text-right">
                 <span className="text-xs font-bold text-amber-400 bg-amber-500/10 px-2 py-1 rounded-lg border border-amber-500/20">
-                  {openByCourse ? openByCourse[course.code] || 0 : course.activeDoubts} Open Doubts
+                  {course.activeDoubts} Open Doubts
                 </span>
               </div>
             </div>
@@ -77,6 +117,22 @@ export const CoursesPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Personal progress */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-300 font-medium">My Doubts Resolved</span>
+                <span className="font-mono font-bold text-emerald-400">
+                  {course.myResolved}/{course.myDoubts}
+                </span>
+              </div>
+              <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-600 to-teal-500 rounded-full"
+                  style={{ width: `${course.progress}%` }}
+                />
+              </div>
+            </div>
+
             {/* Lecture Schedule */}
             <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -90,19 +146,27 @@ export const CoursesPage: React.FC = () => {
             </div>
 
             {/* Actions */}
-            <div className="pt-2 flex items-center justify-between gap-3">
+            <div className="pt-2 grid grid-cols-3 gap-2">
+              <Button
+                variant={course.isEnrolled ? 'secondary' : 'gradient'}
+                size="sm"
+                onClick={() => handleEnroll(course)}
+                className="w-full text-xs"
+              >
+                {course.isEnrolled ? 'Unenroll' : 'Enroll'}
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate('/doubts')}
+                onClick={() => navigate(`/doubts?course=${course.code}`)}
                 className="w-full text-xs"
               >
-                View Course Doubts
+                Course Doubts
               </Button>
               <Button
-                variant="gradient"
+                variant="outline"
                 size="sm"
-                onClick={() => navigate('/knowledge')}
+                onClick={() => navigate(`/knowledge?search=${course.code}`)}
                 className="w-full text-xs"
               >
                 Course Notes

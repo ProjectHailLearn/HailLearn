@@ -76,7 +76,7 @@ export const DashboardOverview: React.FC = () => {
 
         {/* Right 1 Column: Mastery Index, Mentors, Study Rooms */}
         <div className="space-y-6">
-          <MasteryMatrix />
+          <MasteryMatrix stats={stats} />
           <TopMentorsCard />
           <StudyRoomsCard />
         </div>

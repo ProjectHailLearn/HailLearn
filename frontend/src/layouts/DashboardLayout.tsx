@@ -24,8 +24,10 @@ import {
   setCommandPaletteOpen,
   toggleNotificationDrawer,
   setNotifications,
+  addNotification,
 } from '../store/slices/uiSlice';
-import { notificationService } from '../services/notificationService';
+import { notificationService, toNotification } from '../services/notificationService';
+import { connectSocket, disconnectSocket } from '../services/socketService';
 import { logout } from '../store/slices/authSlice';
 import { Avatar } from '../components/common/Avatar';
 import { Button } from '../components/common/Button';
@@ -38,7 +40,7 @@ export const DashboardLayout: React.FC = () => {
   const navigate = useNavigate();
   const isSidebarCollapsed = useAppSelector((state) => state.ui.isSidebarCollapsed);
   const user = useAppSelector((state) => state.auth.user);
-  const handleLogout = () => { dispatch(logout()); navigate('/login'); };
+  const handleLogout = () => { disconnectSocket(); dispatch(logout()); navigate('/login'); };
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -51,14 +53,21 @@ export const DashboardLayout: React.FC = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Poll notifications (Socket.IO push can replace this later).
-  const isDrawerOpen = useAppSelector((state) => state.ui.isNotificationDrawerOpen);
+  // Real-time notifications over Socket.IO, with a slow poll as a fallback.
+  const token = useAppSelector((state) => state.auth.token);
   useEffect(() => {
+    if (!token) return;
     const load = () => notificationService.getAll().then((n) => dispatch(setNotifications(n))).catch(() => {});
     load();
-    const id = window.setInterval(load, 30000);
-    return () => window.clearInterval(id);
-  }, [dispatch, isDrawerOpen, location.pathname]);
+    const socket = connectSocket(token);
+    const onNotification = (n: Record<string, unknown>) => dispatch(addNotification(toNotification(n)));
+    socket.on('notification', onNotification);
+    const id = window.setInterval(load, 120000);
+    return () => {
+      socket.off('notification', onNotification);
+      window.clearInterval(id);
+    };
+  }, [dispatch, token]);
 
   const unreadNotifCount = useAppSelector(
     (state) => state.ui.notifications.filter((n) => !n.read).length

@@ -1,24 +1,38 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Target, Trophy, ArrowUpRight } from 'lucide-react';
 import { Card } from '../common/Card';
 import { useNavigate } from 'react-router-dom';
+import { courseService } from '../../services/courseService';
+import { Course, DashboardStats } from '../../types';
 
-export const MasteryMatrix: React.FC = () => {
+const BAR_COLORS = ['bg-brand-500', 'bg-indigo-500', 'bg-emerald-500', 'bg-amber-500', 'bg-purple-500'];
+
+export const MasteryMatrix: React.FC<{ stats: DashboardStats | null }> = ({ stats }) => {
   const navigate = useNavigate();
+  const [courses, setCourses] = useState<Course[]>([]);
 
-  const subjects = [
-    { name: 'Data Structures & Algorithms', score: 86, color: 'bg-brand-500', barGlow: 'shadow-brand-500/30' },
-    { name: 'Distributed Systems & Cloud', score: 68, color: 'bg-indigo-500', barGlow: 'shadow-indigo-500/30' },
-    { name: 'Deep Learning & Transformers', score: 92, color: 'bg-emerald-500', barGlow: 'shadow-emerald-500/30' },
-    { name: 'Database Engine Internals', score: 58, color: 'bg-amber-500', barGlow: 'shadow-amber-500/30' },
-  ];
+  useEffect(() => {
+    courseService.getAll().then(setCourses).catch(console.error);
+  }, [stats?.myDoubts]);
+
+  // Show enrolled courses; fall back to every course until the user enrolls.
+  const enrolled = courses.filter((c) => c.isEnrolled);
+  const subjects = (enrolled.length ? enrolled : courses).map((c, i) => ({
+    name: `${c.code} · ${c.subject}`,
+    score: c.progress,
+    detail: `${c.myResolved}/${c.myDoubts}`,
+    color: BAR_COLORS[i % BAR_COLORS.length],
+  }));
+  const percentile = stats && stats.totalUsers
+    ? Math.max(1, Math.round((stats.karmaRank / stats.totalUsers) * 100))
+    : null;
 
   return (
     <Card variant="glass" className="p-5">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Target className="w-4 h-4 text-brand-400" />
-          <h3 className="text-sm font-bold text-white">Subject Mastery Index</h3>
+          <h3 className="text-sm font-bold text-white">Course Progress</h3>
         </div>
         <button
           onClick={() => navigate('/courses')}
@@ -36,11 +50,11 @@ export const MasteryMatrix: React.FC = () => {
               <span className="text-slate-300 font-medium truncate max-w-[190px]">
                 {subj.name}
               </span>
-              <span className="font-mono font-bold text-slate-200">{subj.score}%</span>
+              <span className="font-mono font-bold text-slate-200" title="Your doubts resolved">{subj.detail}</span>
             </div>
             <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
               <div
-                className={`h-full rounded-full transition-all duration-500 shadow-md ${subj.color} ${subj.barGlow}`}
+                className={`h-full rounded-full transition-all duration-500 shadow-md ${subj.color}`}
                 style={{ width: `${subj.score}%` }}
               />
             </div>
@@ -53,8 +67,12 @@ export const MasteryMatrix: React.FC = () => {
           <Trophy className="w-4 h-4" />
         </div>
         <div className="text-xs">
-          <div className="font-semibold text-slate-200">Dean’s Honor Standing</div>
-          <div className="text-slate-400">Top 5% across CSE department</div>
+          <div className="font-semibold text-slate-200">
+            Karma Rank {stats ? `#${stats.karmaRank} of ${stats.totalUsers}` : '—'}
+          </div>
+          <div className="text-slate-400">
+            {percentile !== null ? `Top ${percentile}% on campus · ${stats?.karmaPoints} pts` : 'Loading…'}
+          </div>
         </div>
       </div>
     </Card>

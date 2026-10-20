@@ -19,6 +19,19 @@ export const knowledgeService = {
       tags: (k.tags as string[]) || [],
       snippet: k.snippet as string,
       similarityScore: k.similarityScore as number | undefined,
+      hasUpvoted: (k.hasUpvoted as boolean) || false,
     }));
+  },
+  getCategories: async (): Promise<string[]> => {
+    const res = await api.get('/knowledge/categories');
+    return res.data.data;
+  },
+  toggleUpvote: async (id: string): Promise<{ upvotes: number; hasUpvoted: boolean }> => {
+    const res = await api.put(`/knowledge/${id}/upvote`);
+    return res.data.data;
+  },
+  recordView: async (id: string): Promise<{ views: number }> => {
+    const res = await api.put(`/knowledge/${id}/view`);
+    return res.data.data;
   },
 };

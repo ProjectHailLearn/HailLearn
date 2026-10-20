@@ -10,18 +10,20 @@ const timeAgo = (iso: string): string => {
   return `${Math.floor(hrs / 24)}d ago`;
 };
 
+export const toNotification = (n: Record<string, unknown>): Notification => ({
+  id: n._id as string,
+  title: n.title as string,
+  message: n.message as string,
+  timestamp: timeAgo(n.createdAt as string),
+  read: n.read as boolean,
+  type: n.type as Notification['type'],
+  link: n.link as string | undefined,
+});
+
 export const notificationService = {
   getAll: async (): Promise<Notification[]> => {
     const res = await api.get('/notifications');
-    return res.data.data.map((n: Record<string, unknown>) => ({
-      id: n._id as string,
-      title: n.title as string,
-      message: n.message as string,
-      timestamp: timeAgo(n.createdAt as string),
-      read: n.read as boolean,
-      type: n.type as Notification['type'],
-      link: n.link as string | undefined,
-    }));
+    return res.data.data.map(toNotification);
   },
   markRead: async (id: string): Promise<void> => {
     await api.put(`/notifications/${id}/read`);

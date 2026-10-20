@@ -13,6 +13,7 @@ export const doubtService = {
   create: async (payload: {
     title: string; description: string; codeSnippet?: string;
     subject: string; courseCode: string; tags?: string[];
+    depth?: 'detailed' | 'concise' | 'socratic';
   }): Promise<Doubt> => {
     const res = await api.post('/doubts', payload);
     return toDoubt(res.data.data);
