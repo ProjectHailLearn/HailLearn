@@ -8,7 +8,11 @@ let io: Server | null = null;
 const connections = new Map<string, number>();
 
 const isAllowedOrigin = (origin: string | undefined): boolean =>
-  !origin || /^http:\/\/localhost:\d+$/.test(origin) || origin === (process.env.CLIENT_URL || 'http://localhost:5173');
+  !origin ||
+  /^http:\/\/localhost:\d+$/.test(origin) ||
+  Boolean(process.env.VERCEL) ||
+  (origin ? /^https:\/\/.*\.vercel\.app$/.test(origin) : false) ||
+  origin === (process.env.CLIENT_URL || 'http://localhost:5173');
 
 const setPresence = async (userId: string, isOnline: boolean): Promise<void> => {
   try {

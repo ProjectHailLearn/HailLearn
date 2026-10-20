@@ -4,8 +4,10 @@ import { API_URL } from './api';
 let socket: Socket | null = null;
 let socketToken: string | null = null;
 
-// Socket server lives at the API origin (strip the /api path).
-const SOCKET_URL = API_URL.replace(/\/api\/?$/, '');
+// Socket server lives at the API origin (strip the /api path, or use window origin for relative path).
+const SOCKET_URL = API_URL.startsWith('http')
+  ? API_URL.replace(/\/api\/?$/, '')
+  : (typeof window !== 'undefined' ? window.location.origin : '');
 
 // Reuses the socket for the same token; a different token (account switch) gets a fresh connection.
 export const connectSocket = (token: string): Socket => {

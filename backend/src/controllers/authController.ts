@@ -156,7 +156,8 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
       { _id: user._id },
       { passwordResetHash: hashToken(token), passwordResetExpires: new Date(Date.now() + 60 * 60000) }
     );
-    const link = `${process.env.CLIENT_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
+    const clientBase = process.env.CLIENT_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:5173');
+    const link = `${clientBase}/reset-password?token=${token}`;
     await sendEmail(
       user.email,
       'Reset your HailLearn password',

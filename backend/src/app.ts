@@ -12,6 +12,8 @@ import roomRoutes from './routes/roomRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import { Mentor } from './models/Mentor.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import mongoose from 'mongoose';
+import { connectDB } from './config/database.js';
 import { getStats } from './controllers/statsController.js';
 import { protect } from './middlewares/auth.js';
 
@@ -26,6 +28,8 @@ export const createApp = (): Express => {
         if (!origin) return callback(null, true);
         // Allow any localhost port in development
         if (/^http:\/\/localhost:\d+$/.test(origin)) return callback(null, true);
+        // Allow Vercel preview and production domains
+        if (process.env.VERCEL || /^https:\/\/.*\.vercel\.app$/.test(origin)) return callback(null, true);
         const allowed = process.env.CLIENT_URL || 'http://localhost:5173';
         if (origin === allowed) return callback(null, true);
         callback(new Error('Not allowed by CORS'));
@@ -33,6 +37,18 @@ export const createApp = (): Express => {
       credentials: true,
     })
   );
+
+  // Auto-connect to MongoDB if configured and not yet connected (supports serverless)
+  app.use(async (_req: Request, _res: Response, next: NextFunction) => {
+    try {
+      if (process.env.MONGODB_URI && mongoose.connection.readyState < 1) {
+        await connectDB();
+      }
+      next();
+    } catch (err) {
+      next(err);
+    }
+  });
 
   const limiter = rateLimit({
     windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
@@ -84,3 +100,6 @@ export const createApp = (): Express => {
 
   return app;
 };
+
+const app: Express = createApp();
+export default app;
