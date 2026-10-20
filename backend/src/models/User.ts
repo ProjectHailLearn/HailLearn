@@ -13,6 +13,9 @@ export interface IUser extends Document {
   avatar: string;
   specializations: string[];
   rating?: number;
+  preferences: { aiModel: string; emailNotifications: boolean };
+  passwordResetHash?: string;
+  passwordResetExpires?: Date;
   comparePassword(candidate: string): Promise<boolean>;
 }
 
@@ -29,6 +32,12 @@ const UserSchema = new Schema<IUser>(
     avatar: { type: String, default: '' },
     specializations: { type: [String], default: [] },
     rating: { type: Number, min: 0, max: 5 },
+    preferences: {
+      aiModel: { type: String, default: 'gemini-1.5-flash' },
+      emailNotifications: { type: Boolean, default: true },
+    },
+    passwordResetHash: { type: String, select: false },
+    passwordResetExpires: { type: Date, select: false },
   },
   { timestamps: true }
 );

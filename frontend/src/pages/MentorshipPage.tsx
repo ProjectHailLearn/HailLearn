@@ -12,8 +12,12 @@ import {
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { Avatar } from '../components/common/Avatar';
-import { Mentor } from '../types';
+import { Mentor, MentorRequest } from '../types';
 import { mentorService } from '../services/mentorService';
+import { requestService } from '../services/requestService';
+import { getSocket } from '../services/socketService';
+import { ChatPanel } from '../components/mentorship/ChatPanel';
+import { useSearchParams } from 'react-router-dom';
 
 export const MentorshipPage: React.FC = () => {
   const [mentors, setMentors] = useState<Mentor[]>([]);
@@ -22,11 +26,54 @@ export const MentorshipPage: React.FC = () => {
 
   useEffect(() => {
     mentorService.getAll().then(setMentors).catch(console.error);
+    const socket = getSocket();
+    const onPresence = ({ mentorId, isOnline }: { mentorId: string; isOnline: boolean }) =>
+      setMentors((prev) => prev.map((m) => (m.id === mentorId ? { ...m, isOnline } : m)));
+    socket?.on('mentors:presence', onPresence);
+    return () => { socket?.off('mentors:presence', onPresence); };
   }, []);
+
+  const [searchParams] = useSearchParams();
+  const [chatRequest, setChatRequest] = useState<MentorRequest | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [connectModalMentor, setConnectModalMentor] = useState<string | null>(null);
   const [requestSent, setRequestSent] = useState(false);
+  const [topic, setTopic] = useState('');
+  const [mode, setMode] = useState<'Async Chat' | 'Live Video Call'>('Async Chat');
+  const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [requests, setRequests] = useState<{ sent: MentorRequest[]; received: MentorRequest[] }>({ sent: [], received: [] });
+
+  const loadRequests = () =>
+    requestService.getAll().then((r) => {
+      setRequests(r);
+      // Deep link from a notification: /mentorship?chat=<requestId>
+      const chatId = searchParams.get('chat');
+      const match = chatId && [...r.sent, ...r.received].find((x) => x.id === chatId && x.status === 'ACCEPTED');
+      if (match) setChatRequest(match);
+    }).catch(console.error);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadRequests(); }, [searchParams]);
+
+  // Refresh the lists when a request is created/accepted elsewhere.
+  useEffect(() => {
+    const socket = getSocket();
+    const onNotification = (n: { link?: string }) => { if (n.link?.startsWith('/mentorship')) loadRequests(); };
+    socket?.on('notification', onNotification);
+    return () => { socket?.off('notification', onNotification); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleRespond = async (id: string, status: 'ACCEPTED' | 'DECLINED') => {
+    try {
+      await requestService.respond(id, status);
+      loadRequests();
+    } catch (err) {
+      console.error('Failed to respond:', err);
+    }
+  };
 
   const topics = [
     'ALL',
@@ -54,13 +101,36 @@ export const MentorshipPage: React.FC = () => {
 
   const activeMentor = mentors.find((m) => m.id === connectModalMentor);
 
-  const handleSendRequest = (e: React.FormEvent) => {
+  const handleSendRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    setRequestSent(true);
-    setTimeout(() => {
-      setRequestSent(false);
-      setConnectModalMentor(null);
-    }, 1500);
+    if (!connectModalMentor) return;
+    setSending(true);
+    setRequestError(null);
+    try {
+      await requestService.create({
+        mentorId: connectModalMentor,
+        topic,
+        message: `[${mode}] ${message.trim() || `Requesting help with ${topic}`}`,
+      });
+      setRequestSent(true);
+      setTopic('');
+      setMessage('');
+      loadRequests();
+      setTimeout(() => {
+        setRequestSent(false);
+        setConnectModalMentor(null);
+      }, 1500);
+    } catch (err) {
+      setRequestError((err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to send request');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const statusStyle: Record<MentorRequest['status'], string> = {
+    PENDING: 'text-amber-300 bg-amber-500/10 border-amber-500/30',
+    ACCEPTED: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30',
+    DECLINED: 'text-rose-300 bg-rose-500/10 border-rose-500/30',
   };
 
   return (
@@ -84,6 +154,62 @@ export const MentorshipPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* My Requests */}
+      {(requests.received.length > 0 || requests.sent.length > 0) && (
+        <Card variant="glass" className="p-4 space-y-4">
+          {requests.received.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Requests for you</h3>
+              {requests.received.map((r) => (
+                <div key={r.id} className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Avatar src={r.studentAvatar} name={r.studentName} size="sm" />
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-white">{r.studentName}{r.topic && <span className="text-purple-300"> · {r.topic}</span>}</div>
+                      <div className="text-xs text-slate-400 truncate">{r.message}</div>
+                      <div className="text-[10px] text-slate-500">{r.createdAt}</div>
+                    </div>
+                  </div>
+                  {r.status === 'PENDING' ? (
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="gradient" className="text-xs" onClick={() => handleRespond(r.id, 'ACCEPTED')}>Accept</Button>
+                      <Button size="sm" variant="ghost" className="text-xs" onClick={() => handleRespond(r.id, 'DECLINED')}>Decline</Button>
+                    </div>
+                  ) : r.status === 'ACCEPTED' ? (
+                    <Button size="sm" variant="secondary" className="text-xs" leftIcon={<MessageSquare className="w-3.5 h-3.5" />} onClick={() => setChatRequest(r)}>
+                      Chat
+                    </Button>
+                  ) : (
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusStyle[r.status]}`}>{r.status}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          {requests.sent.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Your requests</h3>
+              {requests.sent.map((r) => (
+                <div key={r.id} className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-white">{r.mentorName}{r.topic && <span className="text-purple-300"> · {r.topic}</span>}</div>
+                    <div className="text-[10px] text-slate-500">{r.createdAt}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {r.status === 'ACCEPTED' && (
+                      <Button size="sm" variant="secondary" className="text-xs" leftIcon={<MessageSquare className="w-3.5 h-3.5" />} onClick={() => setChatRequest(r)}>
+                        Chat
+                      </Button>
+                    )}
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusStyle[r.status]}`}>{r.status}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Filter Bar */}
       <Card variant="glass" className="p-4 space-y-3">
@@ -202,12 +328,14 @@ export const MentorshipPage: React.FC = () => {
 
               <Button
                 size="sm"
-                variant="gradient"
+                variant={mentor.hasAccount ? 'gradient' : 'ghost'}
+                disabled={!mentor.hasAccount}
                 onClick={() => setConnectModalMentor(mentor.id)}
                 className="text-xs py-1.5"
                 leftIcon={<MessageSquare className="w-3.5 h-3.5" />}
+                title={mentor.hasAccount ? undefined : 'This mentor has not joined HailLearn yet'}
               >
-                Connect
+                {mentor.hasAccount ? 'Connect' : 'Not joined yet'}
               </Button>
             </div>
           </Card>
@@ -240,7 +368,7 @@ export const MentorshipPage: React.FC = () => {
                   Mentorship Request Dispatched!
                 </div>
                 <div className="text-xs text-slate-400">
-                  {activeMentor.name} has been alerted via university Socket.IO push.
+                  {activeMentor.name} will be notified. Track it under "Your requests".
                 </div>
               </div>
             ) : (
@@ -251,6 +379,8 @@ export const MentorshipPage: React.FC = () => {
                   </label>
                   <input
                     type="text"
+                    value={topic}
+                    onChange={(e) => setTopic(e.target.value)}
                     placeholder="e.g. Distributed Consensus or Dynamic Programming"
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-purple-500"
                     required
@@ -263,17 +393,30 @@ export const MentorshipPage: React.FC = () => {
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     <label className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 cursor-pointer hover:border-slate-700">
-                      <input type="radio" name="mode" defaultChecked className="text-purple-600" />
+                      <input type="radio" name="mode" checked={mode === 'Async Chat'} onChange={() => setMode('Async Chat')} className="text-purple-600" />
                       <MessageSquare className="w-3.5 h-3.5 text-purple-400" />
                       <span>Async Chat</span>
                     </label>
                     <label className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 cursor-pointer hover:border-slate-700">
-                      <input type="radio" name="mode" className="text-purple-600" />
+                      <input type="radio" name="mode" checked={mode === 'Live Video Call'} onChange={() => setMode('Live Video Call')} className="text-purple-600" />
                       <Video className="w-3.5 h-3.5 text-emerald-400" />
                       <span>Live Video Call</span>
                     </label>
                   </div>
                 </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Message (optional)</label>
+                  <textarea
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    rows={2}
+                    placeholder="Share context so the mentor can prepare"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-purple-500 resize-none"
+                  />
+                </div>
+
+                {requestError && <div className="text-xs text-rose-400">{requestError}</div>}
 
                 <div className="flex items-center justify-end gap-2 pt-2">
                   <Button
@@ -284,7 +427,7 @@ export const MentorshipPage: React.FC = () => {
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" variant="gradient" size="sm">
+                  <Button type="submit" variant="gradient" size="sm" isLoading={sending}>
                     Send Invitation
                   </Button>
                 </div>
@@ -293,6 +436,7 @@ export const MentorshipPage: React.FC = () => {
           </div>
         </div>
       )}
+      {chatRequest && <ChatPanel request={chatRequest} onClose={() => setChatRequest(null)} />}
     </div>
   );
 };

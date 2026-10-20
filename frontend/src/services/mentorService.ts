@@ -17,6 +17,7 @@ export const mentorService = {
       isOnline: (m.isOnline as boolean) || false,
       specializations: (m.specializations as string[]) || [],
       bio: (m.bio as string) || '',
+      hasAccount: (m.hasAccount as boolean) || false,
     }));
   },
 };

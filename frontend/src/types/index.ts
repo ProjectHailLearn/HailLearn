@@ -12,6 +12,7 @@ export interface User {
   karmaPoints: number;
   rating?: number;
   specializations?: string[];
+  preferences?: { aiModel: string; emailNotifications: boolean };
 }
 
 export type DoubtStatus = 
@@ -57,9 +58,62 @@ export interface Doubt {
     avatar: string;
     karma: number;
   };
+  answers?: DoubtAnswer[];
   createdAt: string;
   upvotes: number;
   views: number;
+}
+
+export interface DoubtAnswer {
+  authorId: string;
+  authorName: string;
+  authorAvatar: string;
+  role: UserRole;
+  content: string;
+  createdAt: string;
+}
+
+export interface MentorRequest {
+  id: string;
+  studentId: string;
+  studentName: string;
+  studentAvatar: string;
+  mentorId: string;
+  mentorName: string;
+  topic: string;
+  message: string;
+  status: 'PENDING' | 'ACCEPTED' | 'DECLINED';
+  createdAt: string;
+}
+
+export interface DashboardStats {
+  totalDoubts: number;
+  resolved: number;
+  aiResolutionRate: number;
+  escalated: number;
+  verified: number;
+  onlineMentors: number;
+  knowledgeItems: number;
+  myDoubts: number;
+  karmaPoints: number;
+  karmaRank: number;
+  totalUsers: number;
+  doubtsByCourse: Record<string, number>;
+}
+
+export interface StudyRoom {
+  id: string;
+  title: string;
+  courseCode: string;
+  hostId: string;
+  hostName: string;
+  scheduledAt: string;
+  durationMins: number;
+  meetingLink?: string;
+  attendees: number;
+  isAttending: boolean;
+  isHost: boolean;
+  status: 'LIVE' | 'UPCOMING';
 }
 
 export interface Mentor {
@@ -75,6 +129,40 @@ export interface Mentor {
   isOnline: boolean;
   specializations: string[];
   bio: string;
+  hasAccount: boolean;
+}
+
+export interface ChatMessage {
+  id: string;
+  requestId: string;
+  senderId: string;
+  senderName: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  department: string;
+  karmaPoints: number;
+  avatar: string;
+}
+
+export interface AdminMentorProfile {
+  id: string;
+  name: string;
+  department: string;
+  userId: string | null;
+  linkedEmail: string | null;
+}
+
+export interface SystemStatus {
+  aiProvider: 'gemini' | 'grok' | 'fallback';
+  aiConfigured: boolean;
+  onlineMentors: number;
 }
 
 export interface KnowledgeItem {
@@ -90,12 +178,17 @@ export interface KnowledgeItem {
   tags: string[];
   snippet: string;
   similarityScore?: number;
+  hasUpvoted?: boolean;
 }
 
 export interface Course {
   id: string;
   code: string;
   title: string;
+  subject: string;
+  isEnrolled: boolean;
+  myDoubts: number;
+  myResolved: number;
   instructor: string;
   credits: number;
   progress: number;
@@ -113,4 +206,5 @@ export interface Notification {
   timestamp: string;
   read: boolean;
   type: 'ai' | 'mentor' | 'system' | 'course';
+  link?: string;
 }

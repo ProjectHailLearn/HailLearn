@@ -1,6 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Doubt, DoubtStatus } from '../../types';
-import { MOCK_DOUBTS } from '../../constants/mockData';
 
 export interface DoubtState {
   doubts: Doubt[];
@@ -11,8 +10,8 @@ export interface DoubtState {
 }
 
 const initialState: DoubtState = {
-  doubts: MOCK_DOUBTS,
-  activeDoubtId: 'dbt-301',
+  doubts: [],
+  activeDoubtId: null,
   filterStatus: 'ALL',
   searchQuery: '',
   isAiSolving: false,
@@ -22,6 +21,9 @@ export const doubtSlice = createSlice({
   name: 'doubts',
   initialState,
   reducers: {
+    setDoubts: (state, action: PayloadAction<Doubt[]>) => {
+      state.doubts = action.payload;
+    },
     addDoubt: (state, action: PayloadAction<Doubt>) => {
       state.doubts.unshift(action.payload);
       state.activeDoubtId = action.payload.id;
@@ -63,6 +65,7 @@ export const doubtSlice = createSlice({
 });
 
 export const {
+  setDoubts,
   addDoubt,
   setActiveDoubt,
   setFilterStatus,

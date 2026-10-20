@@ -4,13 +4,34 @@ import { useAppDispatch, useAppSelector } from '../../store';
 import {
   toggleNotificationDrawer,
   markAllNotificationsRead,
+  markNotificationRead,
 } from '../../store/slices/uiSlice';
+import { notificationService } from '../../services/notificationService';
+import { useNavigate } from 'react-router-dom';
+import { Notification } from '../../types';
 import { Button } from './Button';
 
 export const NotificationDrawer: React.FC = () => {
   const dispatch = useAppDispatch();
   const isOpen = useAppSelector((state) => state.ui.isNotificationDrawerOpen);
   const notifications = useAppSelector((state) => state.ui.notifications);
+  const navigate = useNavigate();
+
+  const handleMarkAll = () => {
+    dispatch(markAllNotificationsRead());
+    notificationService.markAllRead().catch(console.error);
+  };
+
+  const handleOpen = (notif: Notification) => {
+    if (!notif.read) {
+      dispatch(markNotificationRead(notif.id));
+      notificationService.markRead(notif.id).catch(console.error);
+    }
+    if (notif.link) {
+      dispatch(toggleNotificationDrawer());
+      navigate(notif.link);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -43,7 +64,7 @@ export const NotificationDrawer: React.FC = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => dispatch(markAllNotificationsRead())}
+              onClick={handleMarkAll}
               leftIcon={<CheckCheck className="w-3.5 h-3.5" />}
               className="text-xs text-slate-400 hover:text-white"
             >
@@ -60,10 +81,14 @@ export const NotificationDrawer: React.FC = () => {
 
         {/* List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {notifications.length === 0 && (
+            <div className="text-center text-xs text-slate-500 py-10">You're all caught up.</div>
+          )}
           {notifications.map((notif) => (
             <div
               key={notif.id}
-              className={`p-3.5 rounded-xl border transition ${
+              onClick={() => handleOpen(notif)}
+              className={`p-3.5 rounded-xl border transition cursor-pointer hover:border-brand-500/50 ${
                 notif.read
                   ? 'bg-slate-950/40 border-slate-800/80 text-slate-400'
                   : 'bg-slate-800/60 border-brand-500/30 text-slate-200 shadow-md shadow-brand-500/5'
@@ -91,7 +116,7 @@ export const NotificationDrawer: React.FC = () => {
 
         {/* Footer */}
         <div className="p-3 border-t border-slate-800 text-center text-xs text-slate-500">
-          Real-time university mentorship updates via Socket.IO
+          Updates refresh every 30 seconds
         </div>
       </div>
     </div>

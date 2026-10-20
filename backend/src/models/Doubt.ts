@@ -27,6 +27,8 @@ export interface IDoubt extends Document {
     avatar: string;
     karma: number;
   };
+  answers: { authorId: string; authorName: string; authorAvatar: string; role: string; content: string; createdAt: Date }[];
+  upvotedBy: string[];
   upvotes: number;
   views: number;
   createdAt: Date;
@@ -54,6 +56,20 @@ const DoubtSchema = new Schema<IDoubt>(
     aiConfidenceScore: { type: Number },
     aiSolution: { type: Schema.Types.Mixed },
     assignedMentor: { type: Schema.Types.Mixed },
+    answers: {
+      type: [
+        {
+          authorId: String,
+          authorName: String,
+          authorAvatar: { type: String, default: '' },
+          role: String,
+          content: String,
+          createdAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
+    upvotedBy: { type: [String], default: [] },
     upvotes: { type: Number, default: 0 },
     views: { type: Number, default: 0 },
   },

@@ -23,9 +23,14 @@ import {
   toggleSidebar,
   setCommandPaletteOpen,
   toggleNotificationDrawer,
+  setNotifications,
+  addNotification,
 } from '../store/slices/uiSlice';
-import { setUserRole, logout } from '../store/slices/authSlice';
-import { UserRole } from '../types';
+import { notificationService, toNotification } from '../services/notificationService';
+import { connectSocket, disconnectSocket } from '../services/socketService';
+import { logout } from '../store/slices/authSlice';
+import { systemService } from '../services/adminService';
+import { SystemStatus } from '../types';
 import { Avatar } from '../components/common/Avatar';
 import { Button } from '../components/common/Button';
 import { CommandPalette } from '../components/common/CommandPalette';
@@ -37,7 +42,7 @@ export const DashboardLayout: React.FC = () => {
   const navigate = useNavigate();
   const isSidebarCollapsed = useAppSelector((state) => state.ui.isSidebarCollapsed);
   const user = useAppSelector((state) => state.auth.user);
-  const handleLogout = () => { dispatch(logout()); navigate('/login'); };
+  const handleLogout = () => { disconnectSocket(); dispatch(logout()); navigate('/login'); };
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -49,6 +54,33 @@ export const DashboardLayout: React.FC = () => {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  // Real-time notifications over Socket.IO, with a slow poll as a fallback.
+  const token = useAppSelector((state) => state.auth.token);
+  useEffect(() => {
+    if (!token) return;
+    const load = () => notificationService.getAll().then((n) => dispatch(setNotifications(n))).catch(() => {});
+    load();
+    const socket = connectSocket(token);
+    const onNotification = (n: Record<string, unknown>) => dispatch(addNotification(toNotification(n)));
+    socket.on('notification', onNotification);
+    const id = window.setInterval(load, 120000);
+    return () => {
+      socket.off('notification', onNotification);
+      window.clearInterval(id);
+    };
+  }, [dispatch, token]);
+
+  // AI provider + live mentor count; presence changes are pushed over the socket.
+  const [system, setSystem] = useState<SystemStatus | null>(null);
+  useEffect(() => {
+    if (!token) return;
+    const load = () => systemService.get().then(setSystem).catch(() => {});
+    load();
+    const socket = connectSocket(token);
+    socket.on('mentors:presence', load);
+    return () => { socket.off('mentors:presence', load); };
+  }, [token]);
 
   const unreadNotifCount = useAppSelector(
     (state) => state.ui.notifications.filter((n) => !n.read).length
@@ -71,13 +103,13 @@ export const DashboardLayout: React.FC = () => {
       to: '/mentorship',
       icon: Users,
       label: 'Mentorship Hub',
-      badge: '18 Online',
+      badge: system ? `${system.onlineMentors} Online` : null,
     },
     {
       to: '/knowledge',
       icon: BookOpen,
       label: 'Knowledge Vault',
-      badge: 'RAG',
+      badge: null,
     },
     {
       to: '/courses',
@@ -91,11 +123,10 @@ export const DashboardLayout: React.FC = () => {
       label: 'Settings',
       badge: null,
     },
+    ...(user?.role === 'admin'
+      ? [{ to: '/admin', icon: Shield, label: 'Admin Console', badge: null }]
+      : []),
   ];
-
-  const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    dispatch(setUserRole(e.target.value as UserRole));
-  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-brand-500 selection:text-white">
@@ -208,12 +239,16 @@ export const DashboardLayout: React.FC = () => {
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-200">
                   <Cpu className="w-3.5 h-3.5 text-brand-400" />
-                  <span>Gemini RAG Engine</span>
+                  <span>
+                    {system?.aiProvider === 'gemini' ? 'Gemini AI' : system?.aiProvider === 'grok' ? 'Grok AI' : 'AI Engine'}
+                  </span>
                 </div>
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className={`w-2 h-2 rounded-full ${system?.aiConfigured ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
               </div>
               <p className="text-[11px] text-slate-400 leading-tight">
-                Vector SLA: <strong className="text-slate-300">99.8%</strong> • Latency: <strong className="text-slate-300">180ms</strong>
+                {system?.aiConfigured
+                  ? 'Live AI answers enabled'
+                  : 'Template mode — add an AI key to enable live answers'}
               </p>
             </div>
           )}
@@ -267,27 +302,10 @@ export const DashboardLayout: React.FC = () => {
 
             {/* Right Tools & Profile */}
             <div className="flex items-center gap-3">
-              {/* Role Switcher */}
+              {/* Role Badge */}
               <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-800 rounded-xl px-2.5 py-1">
                 <span className="text-[11px] text-slate-400 font-medium">Role:</span>
-                <select
-                  value={user.role}
-                  onChange={handleRoleChange}
-                  className="bg-transparent text-xs font-semibold text-brand-400 focus:outline-none cursor-pointer"
-                >
-                  <option value="student" className="bg-slate-900 text-slate-200">
-                    Student
-                  </option>
-                  <option value="mentor" className="bg-slate-900 text-slate-200">
-                    Peer Mentor
-                  </option>
-                  <option value="faculty" className="bg-slate-900 text-slate-200">
-                    Faculty
-                  </option>
-                  <option value="admin" className="bg-slate-900 text-slate-200">
-                    Admin
-                  </option>
-                </select>
+                <span className="text-xs font-semibold text-brand-400 capitalize">{user?.role}</span>
               </div>
 
               {/* Notification Bell */}

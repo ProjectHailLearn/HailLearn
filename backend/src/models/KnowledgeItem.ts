@@ -11,6 +11,7 @@ export interface IKnowledgeItem extends Document {
   tags: string[];
   snippet: string;
   similarityScore?: number;
+  upvotedBy: string[];
 }
 
 const KnowledgeItemSchema = new Schema<IKnowledgeItem>(
@@ -25,6 +26,7 @@ const KnowledgeItemSchema = new Schema<IKnowledgeItem>(
     tags: { type: [String], default: [] },
     snippet: { type: String, required: true },
     similarityScore: { type: Number },
+    upvotedBy: { type: [String], default: [] },
   },
   { timestamps: true }
 );

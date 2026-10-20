@@ -1,4 +1,5 @@
 import api from './api';
+import { User } from '../types';
 
 export interface LoginPayload { email: string; password: string; }
 export interface RegisterPayload {
@@ -14,6 +15,21 @@ export const authService = {
   register: async (payload: RegisterPayload) => {
     const res = await api.post('/auth/register', payload);
     return res.data.data;
+  },
+  updateMe: async (payload: Partial<Pick<User, 'name' | 'department' | 'university' | 'semester' | 'avatar' | 'specializations' | 'preferences'>>): Promise<User> => {
+    const res = await api.put('/auth/me', payload);
+    return res.data.data.user;
+  },
+  forgotPassword: async (email: string): Promise<string> => {
+    const res = await api.post('/auth/forgot-password', { email });
+    return res.data.message;
+  },
+  resetPassword: async (token: string, password: string): Promise<{ token: string; user: User }> => {
+    const res = await api.post('/auth/reset-password', { token, password });
+    return res.data.data;
+  },
+  changePassword: async (currentPassword: string, newPassword: string): Promise<void> => {
+    await api.put('/auth/password', { currentPassword, newPassword });
   },
   getMe: async () => {
     const res = await api.get('/auth/me');

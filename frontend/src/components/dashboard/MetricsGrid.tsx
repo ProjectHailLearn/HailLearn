@@ -1,14 +1,16 @@
 import React from 'react';
 import { Sparkles, BookOpen, Clock, TrendingUp } from 'lucide-react';
 import { Card } from '../common/Card';
+import { DashboardStats } from '../../types';
 
-export const MetricsGrid: React.FC = () => {
+export const MetricsGrid: React.FC<{ stats: DashboardStats | null }> = ({ stats }) => {
+  const fmt = (n: number | undefined) => (n === undefined ? '—' : n.toLocaleString());
   const metrics = [
     {
       id: 'resolved',
       label: 'Doubts Resolved',
-      value: '1,482',
-      subtext: '+14.6% vs last week',
+      value: fmt(stats?.resolved),
+      subtext: `of ${fmt(stats?.totalDoubts)} total doubts`,
       trend: 'up',
       icon: Sparkles,
       color: 'text-brand-400',
@@ -18,8 +20,8 @@ export const MetricsGrid: React.FC = () => {
     {
       id: 'ai-rate',
       label: 'AI Auto-Resolution Rate',
-      value: '78.4%',
-      subtext: '98.2% accuracy confidence',
+      value: stats ? `${stats.aiResolutionRate}%` : '—',
+      subtext: 'answered by AI without escalation',
       trend: 'up',
       icon: TrendingUp,
       color: 'text-emerald-400',
@@ -28,9 +30,9 @@ export const MetricsGrid: React.FC = () => {
     },
     {
       id: 'mentor-latency',
-      label: 'Avg Mentor Response',
-      value: '4.2 mins',
-      subtext: '18 faculty & peer active',
+      label: 'In Mentorship',
+      value: fmt(stats?.escalated),
+      subtext: `${fmt(stats?.onlineMentors)} faculty & peer mentors online`,
       trend: 'down',
       icon: Clock,
       color: 'text-purple-400',
@@ -39,9 +41,9 @@ export const MetricsGrid: React.FC = () => {
     },
     {
       id: 'knowledge-retention',
-      label: 'Institutional Knowledge Reuse',
-      value: '96.8%',
-      subtext: '1,240 queries matched in RAG',
+      label: 'Knowledge Vault Entries',
+      value: fmt(stats?.knowledgeItems),
+      subtext: `${fmt(stats?.verified)} faculty-verified doubts`,
       trend: 'up',
       icon: BookOpen,
       color: 'text-amber-400',

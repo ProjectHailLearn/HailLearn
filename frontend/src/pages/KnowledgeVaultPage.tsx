@@ -12,13 +12,42 @@ import {
 import { Card } from '../components/common/Card';
 import { KnowledgeItem } from '../types';
 import { knowledgeService } from '../services/knowledgeService';
+import { useSearchParams } from 'react-router-dom';
 
 export const KnowledgeVaultPage: React.FC = () => {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchParams] = useSearchParams();
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [filteredItems, setFilteredItems] = useState<KnowledgeItem[]>([]);
+  const [categories, setCategories] = useState<string[]>(['ALL']);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [viewed] = useState(() => new Set<string>());
 
-  const categories = ['ALL', 'Database Systems', 'Operating Systems', 'Artificial Intelligence', 'Algorithms'];
+  useEffect(() => {
+    knowledgeService.getCategories().then((c) => setCategories(['ALL', ...c])).catch(console.error);
+  }, []);
+
+  const patchItem = (id: string, patch: Partial<KnowledgeItem>) =>
+    setFilteredItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+
+  const handleOpen = (item: KnowledgeItem) => {
+    setExpandedId((cur) => (cur === item.id ? null : item.id));
+    // Count one view per item per visit.
+    if (!viewed.has(item.id)) {
+      viewed.add(item.id);
+      knowledgeService.recordView(item.id).then(({ views }) => patchItem(item.id, { views })).catch(console.error);
+    }
+  };
+
+  const handleUpvote = async (e: React.MouseEvent, item: KnowledgeItem) => {
+    e.stopPropagation();
+    try {
+      const { upvotes, hasUpvoted } = await knowledgeService.toggleUpvote(item.id);
+      patchItem(item.id, { upvotes, hasUpvoted });
+    } catch (err) {
+      console.error('Failed to upvote:', err);
+    }
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -46,7 +75,7 @@ export const KnowledgeVaultPage: React.FC = () => {
 
         <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/30">
           <Sparkles className="w-4 h-4" />
-          <span>Vector Similarity Search Active</span>
+          <span>Keyword Search · Verified Answers</span>
         </div>
       </div>
 
@@ -82,11 +111,17 @@ export const KnowledgeVaultPage: React.FC = () => {
 
       {/* Knowledge Articles List */}
       <div className="space-y-4">
+        {filteredItems.length === 0 && (
+          <div className="text-center text-xs text-slate-500 py-10">
+            No entries match. Faculty-verified doubts are added here automatically.
+          </div>
+        )}
         {filteredItems.map((item) => (
           <Card
             key={item.id}
             variant="glass"
             className="p-5 hover:border-emerald-500/30 transition-all duration-300 group cursor-pointer"
+            onClick={() => handleOpen(item)}
           >
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-2">
@@ -115,7 +150,7 @@ export const KnowledgeVaultPage: React.FC = () => {
               <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 transition flex-shrink-0" />
             </h3>
 
-            <p className="text-xs text-slate-300 leading-relaxed mb-4">
+            <p className={`text-xs text-slate-300 leading-relaxed mb-4 whitespace-pre-wrap ${expandedId === item.id ? '' : 'line-clamp-3'}`}>
               {item.snippet}
             </p>
 
@@ -139,10 +174,14 @@ export const KnowledgeVaultPage: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-4">
-                <span className="flex items-center gap-1 hover:text-emerald-400 transition">
-                  <ThumbsUp className="w-3.5 h-3.5" />
+                <button
+                  onClick={(e) => handleUpvote(e, item)}
+                  className={`flex items-center gap-1 transition ${item.hasUpvoted ? 'text-emerald-400' : 'hover:text-emerald-400'}`}
+                  title={item.hasUpvoted ? 'Remove upvote' : 'Upvote'}
+                >
+                  <ThumbsUp className={`w-3.5 h-3.5 ${item.hasUpvoted ? 'fill-emerald-400/30' : ''}`} />
                   {item.upvotes}
-                </span>
+                </button>
                 <span className="flex items-center gap-1">
                   <Eye className="w-3.5 h-3.5" />
                   {item.views}
