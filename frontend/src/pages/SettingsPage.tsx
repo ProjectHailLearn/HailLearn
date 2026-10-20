@@ -7,17 +7,50 @@ import {
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
-import { useAppSelector } from '../store';
+import { useAppDispatch, useAppSelector } from '../store';
+import { updateProfile } from '../store/slices/authSlice';
+import { authService } from '../services/authService';
 
 export const SettingsPage: React.FC = () => {
   const user = useAppSelector((state) => state.auth.user);
-  const [model, setModel] = useState('gemini-1.5-pro');
+  const dispatch = useAppDispatch();
+  const [model, setModel] = useState(user?.preferences?.aiModel || 'gemini-1.5-flash');
+  const [form, setForm] = useState({
+    name: user?.name || '',
+    university: user?.university || '',
+    department: user?.department || '',
+    semester: user?.semester ? String(user.semester) : '',
+    avatar: user?.avatar || '',
+    specializations: (user?.specializations || []).join(', '),
+  });
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSave = (e: React.FormEvent) => {
+  if (!user) return null;
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await authService.updateMe({
+        name: form.name,
+        university: form.university,
+        department: form.department,
+        semester: form.semester ? Number(form.semester) : undefined,
+        avatar: form.avatar,
+        specializations: form.specializations.split(',').map((x) => x.trim()).filter(Boolean),
+        preferences: { aiModel: model, emailNotifications: user.preferences?.emailNotifications ?? true },
+      });
+      dispatch(updateProfile(updated));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to save settings');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -101,35 +134,71 @@ export const SettingsPage: React.FC = () => {
           </div>
         </Card>
 
-        {/* Institutional Settings */}
+        {/* Profile */}
         <Card variant="glass" className="p-6 space-y-4">
           <div className="flex items-center gap-2.5 pb-3 border-b border-slate-800">
             <Shield className="w-5 h-5 text-indigo-400" />
             <div>
-              <h3 className="text-sm font-bold text-white">University Identity & Privacy</h3>
+              <h3 className="text-sm font-bold text-white">Profile & University Identity</h3>
               <p className="text-xs text-slate-400">
-                Institutional SSO and departmental access configurations
+                {user.email} · {user.role}
               </p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
+              <label className="block text-slate-300 font-semibold mb-1">Full Name</label>
+              <input
+                type="text"
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-200 focus:outline-none focus:border-brand-500"
+              />
+            </div>
+            <div>
               <label className="block text-slate-300 font-semibold mb-1">University</label>
               <input
                 type="text"
-                disabled
-                value={user.university}
-                className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-400 font-mono"
+                value={form.university}
+                onChange={(e) => setForm((f) => ({ ...f, university: e.target.value }))}
+                className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-200 focus:outline-none focus:border-brand-500"
               />
             </div>
             <div>
               <label className="block text-slate-300 font-semibold mb-1">Department</label>
               <input
                 type="text"
-                disabled
-                value={user.department}
-                className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-400 font-mono"
+                value={form.department}
+                onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
+                className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-200 focus:outline-none focus:border-brand-500"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Semester</label>
+              <input
+                type="number"
+                value={form.semester}
+                onChange={(e) => setForm((f) => ({ ...f, semester: e.target.value }))}
+                className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-200 focus:outline-none focus:border-brand-500"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Avatar URL</label>
+              <input
+                type="text"
+                value={form.avatar}
+                onChange={(e) => setForm((f) => ({ ...f, avatar: e.target.value }))}
+                className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-200 focus:outline-none focus:border-brand-500"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Specializations (comma separated)</label>
+              <input
+                type="text"
+                value={form.specializations}
+                onChange={(e) => setForm((f) => ({ ...f, specializations: e.target.value }))}
+                className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-200 focus:outline-none focus:border-brand-500"
               />
             </div>
           </div>
@@ -141,11 +210,13 @@ export const SettingsPage: React.FC = () => {
               <CheckCircle2 className="w-4 h-4" />
               Settings successfully saved!
             </span>
+          ) : error ? (
+            <span className="text-xs font-semibold text-rose-400">{error}</span>
           ) : (
             <span />
           )}
 
-          <Button type="submit" variant="gradient" size="md">
+          <Button type="submit" variant="gradient" size="md" isLoading={saving}>
             Save Preferences
           </Button>
         </div>

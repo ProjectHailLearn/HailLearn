@@ -58,7 +58,10 @@ export const authSlice = createSlice({
       if (state.user) state.user.karmaPoints += action.payload;
     },
     updateProfile: (state, action: PayloadAction<Partial<User>>) => {
-      if (state.user) state.user = { ...state.user, ...action.payload };
+      if (state.user) {
+        state.user = { ...state.user, ...action.payload };
+        localStorage.setItem('hl_user', JSON.stringify(state.user));
+      }
     },
     clearError: (state) => { state.error = null; },
   },

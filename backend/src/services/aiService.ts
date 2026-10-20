@@ -12,6 +12,7 @@ export interface SolveInput {
   subject: string;
   courseCode: string;
   university?: string;
+  preferredModel?: string;
 }
 
 export interface SolveResult {
@@ -114,6 +115,10 @@ const callGrok = async (prompt: string, key: string, model: string): Promise<str
   return data.choices?.[0]?.message?.content ?? '';
 };
 
+// Env AI_MODEL wins; otherwise use the user's saved preference if it belongs to the active provider.
+const pickModel = (provider: string, preferred: string | undefined, fallback: string): string =>
+  process.env.AI_MODEL || (preferred?.startsWith(provider) ? preferred : fallback);
+
 export const solveDoubt = async (input: SolveInput): Promise<SolveResult> => {
   const provider = (process.env.AI_PROVIDER || '').toLowerCase();
   const key = process.env.AI_API_KEY;
@@ -123,8 +128,8 @@ export const solveDoubt = async (input: SolveInput): Promise<SolveResult> => {
     const prompt = buildPrompt(input);
     const text =
       provider === 'gemini'
-        ? await callGemini(prompt, key, process.env.AI_MODEL || 'gemini-1.5-flash')
-        : await callGrok(prompt, key, process.env.AI_MODEL || 'grok-2-latest');
+        ? await callGemini(prompt, key, pickModel(provider, input.preferredModel, 'gemini-1.5-flash'))
+        : await callGrok(prompt, key, pickModel(provider, input.preferredModel, 'grok-2-latest'));
     const parsed = normalize(extractJson(text));
     if (!parsed) return fallbackSolution(input);
     return { aiSolution: parsed.solution, aiConfidenceScore: parsed.confidence, source: provider };

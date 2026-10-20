@@ -12,6 +12,7 @@ export interface User {
   karmaPoints: number;
   rating?: number;
   specializations?: string[];
+  preferences?: { aiModel: string; emailNotifications: boolean };
 }
 
 export type DoubtStatus = 
@@ -57,9 +58,45 @@ export interface Doubt {
     avatar: string;
     karma: number;
   };
+  answers?: DoubtAnswer[];
   createdAt: string;
   upvotes: number;
   views: number;
+}
+
+export interface DoubtAnswer {
+  authorId: string;
+  authorName: string;
+  authorAvatar: string;
+  role: UserRole;
+  content: string;
+  createdAt: string;
+}
+
+export interface MentorRequest {
+  id: string;
+  studentId: string;
+  studentName: string;
+  studentAvatar: string;
+  mentorId: string;
+  mentorName: string;
+  topic: string;
+  message: string;
+  status: 'PENDING' | 'ACCEPTED' | 'DECLINED';
+  createdAt: string;
+}
+
+export interface DashboardStats {
+  totalDoubts: number;
+  resolved: number;
+  aiResolutionRate: number;
+  escalated: number;
+  verified: number;
+  onlineMentors: number;
+  knowledgeItems: number;
+  myDoubts: number;
+  karmaPoints: number;
+  doubtsByCourse: Record<string, number>;
 }
 
 export interface Mentor {
@@ -113,4 +150,5 @@ export interface Notification {
   timestamp: string;
   read: boolean;
   type: 'ai' | 'mentor' | 'system' | 'course';
+  link?: string;
 }

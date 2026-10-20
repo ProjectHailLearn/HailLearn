@@ -1,6 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Notification } from '../../types';
-import { MOCK_NOTIFICATIONS } from '../../constants/mockData';
 
 export interface UIState {
   isSidebarCollapsed: boolean;
@@ -14,7 +13,7 @@ const initialState: UIState = {
   isSidebarCollapsed: false,
   isCommandPaletteOpen: false,
   isQuickAskModalOpen: false,
-  notifications: MOCK_NOTIFICATIONS,
+  notifications: [],
   isNotificationDrawerOpen: false,
 };
 
@@ -42,6 +41,13 @@ export const uiSlice = createSlice({
         n.read = true;
       });
     },
+    setNotifications: (state, action: PayloadAction<Notification[]>) => {
+      state.notifications = action.payload;
+    },
+    markNotificationRead: (state, action: PayloadAction<string>) => {
+      const n = state.notifications.find((x) => x.id === action.payload);
+      if (n) n.read = true;
+    },
     addNotification: (state, action: PayloadAction<Notification>) => {
       state.notifications.unshift(action.payload);
     },
@@ -56,6 +62,8 @@ export const {
   toggleNotificationDrawer,
   markAllNotificationsRead,
   addNotification,
+  setNotifications,
+  markNotificationRead,
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

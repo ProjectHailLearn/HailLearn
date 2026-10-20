@@ -1,14 +1,37 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { MetricsGrid } from '../components/dashboard/MetricsGrid';
 import { QuickAskCard } from '../components/dashboard/QuickAskCard';
 import { DoubtFeedTable } from '../components/dashboard/DoubtFeedTable';
 import { MasteryMatrix } from '../components/dashboard/MasteryMatrix';
 import { TopMentorsCard } from '../components/dashboard/TopMentorsCard';
 import { StudyRoomsCard } from '../components/dashboard/StudyRoomsCard';
-import { useAppSelector } from '../store';
+import { useAppDispatch, useAppSelector } from '../store';
+import { setDoubts } from '../store/slices/doubtSlice';
+import { setMentors } from '../store/slices/mentorSlice';
+import { updateProfile } from '../store/slices/authSlice';
+import { doubtService } from '../services/doubtService';
+import { mentorService } from '../services/mentorService';
+import { statsService } from '../services/statsService';
+import { authService } from '../services/authService';
+import { DashboardStats } from '../types';
 
 export const DashboardOverview: React.FC = () => {
   const user = useAppSelector((state) => state.auth.user);
+  const doubtCount = useAppSelector((state) => state.doubts.doubts.length);
+  const dispatch = useAppDispatch();
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+
+  useEffect(() => {
+    doubtService.getAll().then((d) => dispatch(setDoubts(d))).catch(console.error);
+    mentorService.getAll().then((m) => dispatch(setMentors(m))).catch(console.error);
+    authService.getMe().then((u) => dispatch(updateProfile(u))).catch(console.error);
+  }, [dispatch]);
+
+  // Refresh stats whenever a doubt is added from Quick Ask.
+  useEffect(() => {
+    statsService.get().then(setStats).catch(console.error);
+  }, [doubtCount]);
+
   if (!user) return null;
 
   return (
@@ -20,7 +43,7 @@ export const DashboardOverview: React.FC = () => {
             Welcome back, {user.name} 👋
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 max-w-2xl">
-            HailLearn has indexed <strong className="text-brand-300">4 active courses</strong> and <strong className="text-purple-300">18 mentors</strong> for the {user.department}. All queries are backed by Gemini Vector RAG.
+            HailLearn has <strong className="text-brand-300">{stats?.totalDoubts ?? '—'} doubts</strong> and <strong className="text-purple-300">{stats?.onlineMentors ?? '—'} mentors online</strong> for the {user.department}. You've asked <strong className="text-brand-300">{stats?.myDoubts ?? 0}</strong> so far.
           </p>
         </div>
 
@@ -31,7 +54,7 @@ export const DashboardOverview: React.FC = () => {
           </div>
           <div className="px-3.5 py-2 rounded-xl bg-slate-950/70 border border-slate-800 text-center">
             <div className="text-[10px] uppercase font-bold text-slate-400">Karma Score</div>
-            <div className="text-sm font-black text-amber-400">{user.karmaPoints} pts</div>
+            <div className="text-sm font-black text-amber-400">{stats?.karmaPoints ?? user.karmaPoints} pts</div>
           </div>
         </div>
 
@@ -41,7 +64,7 @@ export const DashboardOverview: React.FC = () => {
       </div>
 
       {/* KPI Metrics */}
-      <MetricsGrid />
+      <MetricsGrid stats={stats} />
 
       {/* Main Grid Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

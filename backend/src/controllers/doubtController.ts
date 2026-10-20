@@ -50,6 +50,7 @@ export const createDoubt = async (req: AuthRequest, res: Response): Promise<void
 
     const { aiSolution, aiConfidenceScore, source } = await solveDoubt({
       title, description, codeSnippet, subject, courseCode, university: user.university,
+      preferredModel: user.preferences?.aiModel,
     });
 
     const doubt = await Doubt.create({

@@ -1,6 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Mentor } from '../../types';
-import { MOCK_MENTORS } from '../../constants/mockData';
 
 export interface MentorState {
   mentors: Mentor[];
@@ -10,7 +9,7 @@ export interface MentorState {
 }
 
 const initialState: MentorState = {
-  mentors: MOCK_MENTORS,
+  mentors: [],
   selectedTopic: 'ALL',
   onlineOnly: false,
   activeSessionMentorId: null,
@@ -20,6 +19,9 @@ export const mentorSlice = createSlice({
   name: 'mentors',
   initialState,
   reducers: {
+    setMentors: (state, action: PayloadAction<Mentor[]>) => {
+      state.mentors = action.payload;
+    },
     setSelectedTopic: (state, action: PayloadAction<string>) => {
       state.selectedTopic = action.payload;
     },
@@ -35,7 +37,7 @@ export const mentorSlice = createSlice({
   },
 });
 
-export const { setSelectedTopic, setOnlineOnly, startMentoringSession, endMentoringSession } =
+export const { setMentors, setSelectedTopic, setOnlineOnly, startMentoringSession, endMentoringSession } =
   mentorSlice.actions;
 
 export default mentorSlice.reducer;

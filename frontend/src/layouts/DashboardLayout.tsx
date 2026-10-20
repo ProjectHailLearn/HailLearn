@@ -23,9 +23,10 @@ import {
   toggleSidebar,
   setCommandPaletteOpen,
   toggleNotificationDrawer,
+  setNotifications,
 } from '../store/slices/uiSlice';
-import { setUserRole, logout } from '../store/slices/authSlice';
-import { UserRole } from '../types';
+import { notificationService } from '../services/notificationService';
+import { logout } from '../store/slices/authSlice';
 import { Avatar } from '../components/common/Avatar';
 import { Button } from '../components/common/Button';
 import { CommandPalette } from '../components/common/CommandPalette';
@@ -49,6 +50,15 @@ export const DashboardLayout: React.FC = () => {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  // Poll notifications (Socket.IO push can replace this later).
+  const isDrawerOpen = useAppSelector((state) => state.ui.isNotificationDrawerOpen);
+  useEffect(() => {
+    const load = () => notificationService.getAll().then((n) => dispatch(setNotifications(n))).catch(() => {});
+    load();
+    const id = window.setInterval(load, 30000);
+    return () => window.clearInterval(id);
+  }, [dispatch, isDrawerOpen, location.pathname]);
 
   const unreadNotifCount = useAppSelector(
     (state) => state.ui.notifications.filter((n) => !n.read).length
@@ -92,10 +102,6 @@ export const DashboardLayout: React.FC = () => {
       badge: null,
     },
   ];
-
-  const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    dispatch(setUserRole(e.target.value as UserRole));
-  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-brand-500 selection:text-white">
@@ -267,27 +273,10 @@ export const DashboardLayout: React.FC = () => {
 
             {/* Right Tools & Profile */}
             <div className="flex items-center gap-3">
-              {/* Role Switcher */}
+              {/* Role Badge */}
               <div className="flex items-center gap-1.5 bg-slate-950/80 border border-slate-800 rounded-xl px-2.5 py-1">
                 <span className="text-[11px] text-slate-400 font-medium">Role:</span>
-                <select
-                  value={user.role}
-                  onChange={handleRoleChange}
-                  className="bg-transparent text-xs font-semibold text-brand-400 focus:outline-none cursor-pointer"
-                >
-                  <option value="student" className="bg-slate-900 text-slate-200">
-                    Student
-                  </option>
-                  <option value="mentor" className="bg-slate-900 text-slate-200">
-                    Peer Mentor
-                  </option>
-                  <option value="faculty" className="bg-slate-900 text-slate-200">
-                    Faculty
-                  </option>
-                  <option value="admin" className="bg-slate-900 text-slate-200">
-                    Admin
-                  </option>
-                </select>
+                <span className="text-xs font-semibold text-brand-400 capitalize">{user?.role}</span>
               </div>
 
               {/* Notification Bell */}

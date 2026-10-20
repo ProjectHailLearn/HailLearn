@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   GraduationCap,
   Users,
@@ -8,9 +8,16 @@ import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { MOCK_COURSES } from '../constants/mockData';
 import { useNavigate } from 'react-router-dom';
+import { statsService } from '../services/statsService';
 
 export const CoursesPage: React.FC = () => {
   const navigate = useNavigate();
+  // Course catalog is static for now; open-doubt counts are live from the API.
+  const [openByCourse, setOpenByCourse] = useState<Record<string, number> | null>(null);
+
+  useEffect(() => {
+    statsService.get().then((s) => setOpenByCourse(s.doubtsByCourse)).catch(console.error);
+  }, []);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -51,7 +58,7 @@ export const CoursesPage: React.FC = () => {
 
               <div className="text-right">
                 <span className="text-xs font-bold text-amber-400 bg-amber-500/10 px-2 py-1 rounded-lg border border-amber-500/20">
-                  {course.activeDoubts} Open Doubts
+                  {openByCourse ? openByCourse[course.code] || 0 : course.activeDoubts} Open Doubts
                 </span>
               </div>
             </div>

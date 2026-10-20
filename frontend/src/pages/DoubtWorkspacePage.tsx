@@ -9,6 +9,9 @@ import {
   ThumbsUp,
   AlertCircle,
   Flame,
+  MessageSquare,
+  ShieldCheck,
+  XCircle,
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
@@ -19,9 +22,14 @@ import { Doubt } from '../types';
 import { doubtService } from '../services/doubtService';
 import { mentorService } from '../services/mentorService';
 import { Mentor } from '../types';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+
+const errorMessage = (err: unknown, fallback: string): string =>
+  (err as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback;
 
 export const DoubtWorkspacePage: React.FC = () => {
   const user = useAppSelector((state) => state.auth.user);
+  const navigate = useNavigate();
 
   const [doubts, setDoubts] = useState<Doubt[]>([]);
   const [mentors, setMentors] = useState<Mentor[]>([]);
@@ -33,12 +41,21 @@ export const DoubtWorkspacePage: React.FC = () => {
   const [subject, setSubject] = useState('Data Structures & Algorithms');
   const [isSolving, setIsSolving] = useState(false);
   const [selectedMentorForEscalation, setSelectedMentorForEscalation] = useState('');
+  const [answerText, setAnswerText] = useState('');
+  const [isAnswering, setIsAnswering] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+
+  const isStaff = user?.role === 'mentor' || user?.role === 'faculty' || user?.role === 'admin';
+  const canVerify = user?.role === 'faculty' || user?.role === 'admin';
 
   useEffect(() => {
+    const requestedId = searchParams.get('id');
     doubtService.getAll().then((d) => {
       setDoubts(d);
-      if (d.length > 0) setActiveDoubtId(d[0].id);
-    }).catch(console.error);
+      if (requestedId && d.some((x) => x.id === requestedId)) setActiveDoubtId(requestedId);
+      else if (d.length > 0) setActiveDoubtId(d[0].id);
+    }).catch((err) => setError(errorMessage(err, 'Failed to load doubts')));
     mentorService.getAll().then(setMentors).catch(console.error);
   }, []);
 
@@ -49,37 +66,7 @@ export const DoubtWorkspacePage: React.FC = () => {
     if (!title.trim() || !description.trim() || !user) return;
 
     setIsSolving(true);
-
-    const aiSolution = {
-      summary: `Comprehensive algorithmic and institutional resolution for: "${title}". Validated against ${user.university} ${courseCode} syllabus.`,
-      steps: [
-        {
-          step: 1,
-          title: 'Mathematical Formulation & Complexity Invariants',
-          content: `Deconstructing input variables and constraints. For ${courseCode}, optimal solution requires respecting asymptotic guarantees and cache spatial locality.`,
-        },
-        {
-          step: 2,
-          title: 'Correctness Proof & Edge Case Analysis',
-          content: 'Evaluating boundary conditions (empty subsets, negative cycles, concurrent race states). Proof verified via loop invariants.',
-        },
-        {
-          step: 3,
-          title: 'Optimized Implementation Structure',
-          content: 'Generated clean, memory-efficient solution with strict typing.',
-          codeSnippet: codeSnippet
-            ? `// Optimized Refactor\n${codeSnippet}\n// Time: O((V+E) log V) | Space: O(V)`
-            : `// Solution Implementation\nexport function resolveDoubt() {\n  return { success: true, optimized: true };\n}`,
-          language: 'typescript',
-        },
-      ],
-      citations: [
-        `${user.university} CS Syllabus Reference Vault - Module 3`,
-        'Foundations of Computer Science - Volume II',
-      ],
-      suggestedReadings: ['Asymptotic Analysis Deep Dive', 'Peer Discussion Transcript #109'],
-    };
-
+    setError(null);
     try {
       const newDoubt = await doubtService.create({
         title,
@@ -87,12 +74,7 @@ export const DoubtWorkspacePage: React.FC = () => {
         codeSnippet: codeSnippet.trim() || undefined,
         subject,
         courseCode,
-        tags: [subject.split(' ')[0], 'StudioQuery', courseCode],
-        aiSolution,
-        aiConfidenceScore: 98,
-        authorName: user.name,
-        authorAvatar: user.avatar,
-        authorDepartment: user.department,
+        tags: [subject.split(' ')[0], courseCode],
       });
       setDoubts((prev) => [newDoubt, ...prev]);
       setActiveDoubtId(newDoubt.id);
@@ -100,36 +82,50 @@ export const DoubtWorkspacePage: React.FC = () => {
       setDescription('');
       setCodeSnippet('');
     } catch (err) {
-      console.error('Failed to create doubt:', err);
+      setError(errorMessage(err, 'Failed to submit doubt'));
     } finally {
       setIsSolving(false);
     }
   };
 
-  const handleUpvote = async (doubtId: string) => {
+  const replaceDoubt = (updated: Doubt) =>
+    setDoubts((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+
+  const runAction = async (action: () => Promise<Doubt>, fallback: string) => {
+    setError(null);
     try {
-      const updated = await doubtService.upvote(doubtId);
-      setDoubts((prev) => prev.map((d) => (d.id === doubtId ? updated : d)));
+      replaceDoubt(await action());
     } catch (err) {
-      console.error('Failed to upvote:', err);
+      setError(errorMessage(err, fallback));
     }
+  };
+
+  const handleAnswer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeDoubt || !answerText.trim()) return;
+    setIsAnswering(true);
+    await runAction(() => doubtService.answer(activeDoubt.id, answerText.trim()), 'Failed to post answer');
+    setAnswerText('');
+    setIsAnswering(false);
+  };
+
+  const handleUpvote = async (doubtId: string) => {
+    await runAction(() => doubtService.upvote(doubtId), 'Failed to upvote');
   };
 
   const handleEscalate = async () => {
     if (!activeDoubt) return;
     const mentor = mentors.find((m) => m.id === selectedMentorForEscalation) || mentors[0];
     if (!mentor) return;
-    try {
-      const updated = await doubtService.escalate(activeDoubt.id, {
+    await runAction(
+      () => doubtService.escalate(activeDoubt.id, {
         mentorId: mentor.id,
         mentorName: mentor.name,
         mentorAvatar: mentor.avatar,
         karma: mentor.karmaPoints,
-      });
-      setDoubts((prev) => prev.map((d) => (d.id === activeDoubt.id ? updated : d)));
-    } catch (err) {
-      console.error('Failed to escalate:', err);
-    }
+      }),
+      'Failed to escalate'
+    );
   };
 
   return (
@@ -145,6 +141,13 @@ export const DoubtWorkspacePage: React.FC = () => {
           </p>
         </div>
       </div>
+
+      {error && (
+        <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300 flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-rose-400 hover:text-rose-200">Dismiss</button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column */}
@@ -237,7 +240,7 @@ export const DoubtWorkspacePage: React.FC = () => {
                 isLoading={isSolving}
                 leftIcon={<Sparkles className="w-4 h-4" />}
               >
-                Synthesize Solution via Gemini AI
+                Solve with HailLearn AI
               </Button>
             </form>
           </Card>
@@ -379,7 +382,7 @@ export const DoubtWorkspacePage: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                      <Button size="sm" variant="secondary" className="text-xs">Open 1-on-1 Chat</Button>
+                      <Button size="sm" variant="secondary" className="text-xs" onClick={() => navigate('/mentorship')}>Open Mentorship</Button>
                     </div>
                   ) : (
                     <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -418,6 +421,68 @@ export const DoubtWorkspacePage: React.FC = () => {
                   <div className="text-xs text-slate-500">Synthesizing domain references and mathematical bounds.</div>
                 </div>
               )}
+
+              {/* Mentor / Faculty answers */}
+              <div className="space-y-3 pt-5 border-t border-slate-800">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-purple-400" />
+                  Mentor & Faculty Answers ({activeDoubt.answers?.length || 0})
+                </h3>
+                {(activeDoubt.answers || []).map((a, idx) => (
+                  <div key={idx} className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
+                    <div className="flex items-center gap-2 text-xs">
+                      <Avatar src={a.authorAvatar} name={a.authorName} size="xs" />
+                      <span className="font-semibold text-slate-200">{a.authorName}</span>
+                      <span className="text-[10px] uppercase tracking-wider text-purple-300 bg-purple-500/10 px-1.5 py-0.5 rounded">{a.role}</span>
+                      <span className="text-[10px] text-slate-500 ml-auto">{new Date(a.createdAt).toLocaleString()}</span>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{a.content}</p>
+                  </div>
+                ))}
+                {!activeDoubt.answers?.length && (
+                  <p className="text-xs text-slate-500">No human answers yet.</p>
+                )}
+
+                {isStaff && activeDoubt.status !== 'CLOSED' && (
+                  <form onSubmit={handleAnswer} className="space-y-2">
+                    <textarea
+                      value={answerText}
+                      onChange={(e) => setAnswerText(e.target.value)}
+                      placeholder="Write your answer for the student..."
+                      rows={3}
+                      className="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-3 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-purple-500 resize-none"
+                    />
+                    <Button type="submit" size="sm" variant="secondary" isLoading={isAnswering} disabled={!answerText.trim()} className="text-xs">
+                      Post Answer
+                    </Button>
+                  </form>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  {canVerify && activeDoubt.status !== 'FACULTY_VERIFIED' && activeDoubt.status !== 'CLOSED' && (
+                    <Button
+                      size="sm"
+                      variant="gradient"
+                      className="text-xs"
+                      leftIcon={<ShieldCheck className="w-3.5 h-3.5" />}
+                      onClick={() => runAction(() => doubtService.verify(activeDoubt.id), 'Failed to verify')}
+                    >
+                      Verify & Add to Knowledge Vault
+                    </Button>
+                  )}
+                  {(activeDoubt.author.id === user?.id || canVerify) && activeDoubt.status !== 'CLOSED' && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="text-xs"
+                      leftIcon={<XCircle className="w-3.5 h-3.5" />}
+                      onClick={() => runAction(() => doubtService.close(activeDoubt.id), 'Failed to close')}
+                    >
+                      Mark Resolved & Close
+                    </Button>
+                  )}
+                </div>
+              </div>
             </Card>
           ) : (
             <div className="h-full flex items-center justify-center p-12 text-slate-500">

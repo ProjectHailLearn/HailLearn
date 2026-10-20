@@ -32,7 +32,7 @@ export const DoubtFeedTable: React.FC = () => {
 
   const handleOpenDoubt = (id: string) => {
     dispatch(setActiveDoubt(id));
-    navigate('/doubts');
+    navigate(`/doubts?id=${id}`);
   };
 
   return (

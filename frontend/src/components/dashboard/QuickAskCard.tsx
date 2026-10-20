@@ -4,7 +4,7 @@ import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { addDoubt } from '../../store/slices/doubtSlice';
-import { Doubt } from '../../types';
+import { doubtService } from '../../services/doubtService';
 import { useNavigate } from 'react-router-dom';
 
 export const QuickAskCard: React.FC = () => {
@@ -18,62 +18,31 @@ export const QuickAskCard: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedId, setSubmittedId] = useState<string | null>(null);
 
-  const handleQuickSubmit = (e: React.FormEvent) => {
+  const [confidence, setConfidence] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleQuickSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!question.trim()) return;
+    if (!question.trim() || !user) return;
 
     setIsSubmitting(true);
-
-    setTimeout(() => {
-      const newDoubt: Doubt = {
-        id: `dbt-${Date.now().toString().slice(-4)}`,
-        title: question,
-        description: `Student raised question in ${subject} (${courseCode}): "${question}". AI analyzed intent and provided automated multi-stage derivation.`,
+    setError(null);
+    try {
+      const newDoubt = await doubtService.create({
+        title: question.trim().slice(0, 140),
+        description: question.trim(),
         subject,
         courseCode,
         tags: [subject.split(' ')[0], 'QuickAsk', courseCode],
-        status: 'AI_RESOLVED',
-        author: {
-          id: user.id,
-          name: user.name,
-          avatar: user.avatar,
-          department: user.department,
-        },
-        aiConfidenceScore: 97,
-        aiSolution: {
-          summary: `HailLearn AI synthesized the core principles of "${question}". Root concepts mapped directly to ${courseCode} syllabus standard modules.`,
-          steps: [
-            {
-              step: 1,
-              title: 'Problem Formalization & Invariants',
-              content: `Deconstructing query into state requirements and preconditions specific to ${subject}.`,
-            },
-            {
-              step: 2,
-              title: 'Algorithmic Derivation & Proof',
-              content: 'Analyzing asymptotic bounds, edge cases, and recursive sub-structures.',
-            },
-            {
-              step: 3,
-              title: 'Verification & Peer Escalation Criteria',
-              content: 'Vector match cross-referenced with institutional lecture recordings with 97% confidence.',
-            },
-          ],
-          citations: [
-            `${user.university} ${courseCode} Lecture Notes: Module 4`,
-            'Foundations of Computing & Systems - Reference Handbook',
-          ],
-          suggestedReadings: ['Amortized Time Complexity Guide', 'Practice Set #4'],
-        },
-        createdAt: 'Just now',
-        upvotes: 1,
-        views: 3,
-      };
-
+      });
       dispatch(addDoubt(newDoubt));
-      setIsSubmitting(false);
+      setConfidence(newDoubt.aiConfidenceScore ?? null);
       setSubmittedId(newDoubt.id);
-    }, 900);
+    } catch (err) {
+      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to submit question');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -103,7 +72,7 @@ export const QuickAskCard: React.FC = () => {
             <CheckCircle2 className="w-6 h-6 text-emerald-400 flex-shrink-0" />
             <div>
               <div className="text-sm font-semibold text-emerald-200">
-                Doubt Analyzed & Resolved with 97% Confidence!
+                Doubt Analyzed{confidence !== null ? ` — ${confidence}% Confidence` : ''}!
               </div>
               <div className="text-xs text-emerald-400/80">
                 Step-by-step derivation and citations are ready in your workspace.
@@ -116,7 +85,7 @@ export const QuickAskCard: React.FC = () => {
             onClick={() => {
               setSubmittedId(null);
               setQuestion('');
-              navigate('/doubts');
+              navigate(`/doubts?id=${submittedId}`);
             }}
             rightIcon={<ArrowRight className="w-4 h-4" />}
           >
@@ -135,6 +104,7 @@ export const QuickAskCard: React.FC = () => {
             />
           </div>
 
+          {error && <div className="text-xs text-rose-400">{error}</div>}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
             <div className="flex items-center gap-2">
               {/* Course Selector */}
