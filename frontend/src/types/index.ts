@@ -129,6 +129,40 @@ export interface Mentor {
   isOnline: boolean;
   specializations: string[];
   bio: string;
+  hasAccount: boolean;
+}
+
+export interface ChatMessage {
+  id: string;
+  requestId: string;
+  senderId: string;
+  senderName: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  department: string;
+  karmaPoints: number;
+  avatar: string;
+}
+
+export interface AdminMentorProfile {
+  id: string;
+  name: string;
+  department: string;
+  userId: string | null;
+  linkedEmail: string | null;
+}
+
+export interface SystemStatus {
+  aiProvider: 'gemini' | 'grok' | 'fallback';
+  aiConfigured: boolean;
+  onlineMentors: number;
 }
 
 export interface KnowledgeItem {

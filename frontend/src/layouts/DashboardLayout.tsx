@@ -29,6 +29,8 @@ import {
 import { notificationService, toNotification } from '../services/notificationService';
 import { connectSocket, disconnectSocket } from '../services/socketService';
 import { logout } from '../store/slices/authSlice';
+import { systemService } from '../services/adminService';
+import { SystemStatus } from '../types';
 import { Avatar } from '../components/common/Avatar';
 import { Button } from '../components/common/Button';
 import { CommandPalette } from '../components/common/CommandPalette';
@@ -69,6 +71,17 @@ export const DashboardLayout: React.FC = () => {
     };
   }, [dispatch, token]);
 
+  // AI provider + live mentor count; presence changes are pushed over the socket.
+  const [system, setSystem] = useState<SystemStatus | null>(null);
+  useEffect(() => {
+    if (!token) return;
+    const load = () => systemService.get().then(setSystem).catch(() => {});
+    load();
+    const socket = connectSocket(token);
+    socket.on('mentors:presence', load);
+    return () => { socket.off('mentors:presence', load); };
+  }, [token]);
+
   const unreadNotifCount = useAppSelector(
     (state) => state.ui.notifications.filter((n) => !n.read).length
   );
@@ -90,13 +103,13 @@ export const DashboardLayout: React.FC = () => {
       to: '/mentorship',
       icon: Users,
       label: 'Mentorship Hub',
-      badge: '18 Online',
+      badge: system ? `${system.onlineMentors} Online` : null,
     },
     {
       to: '/knowledge',
       icon: BookOpen,
       label: 'Knowledge Vault',
-      badge: 'RAG',
+      badge: null,
     },
     {
       to: '/courses',
@@ -110,6 +123,9 @@ export const DashboardLayout: React.FC = () => {
       label: 'Settings',
       badge: null,
     },
+    ...(user?.role === 'admin'
+      ? [{ to: '/admin', icon: Shield, label: 'Admin Console', badge: null }]
+      : []),
   ];
 
   return (
@@ -223,12 +239,16 @@ export const DashboardLayout: React.FC = () => {
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-200">
                   <Cpu className="w-3.5 h-3.5 text-brand-400" />
-                  <span>Gemini RAG Engine</span>
+                  <span>
+                    {system?.aiProvider === 'gemini' ? 'Gemini AI' : system?.aiProvider === 'grok' ? 'Grok AI' : 'AI Engine'}
+                  </span>
                 </div>
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className={`w-2 h-2 rounded-full ${system?.aiConfigured ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
               </div>
               <p className="text-[11px] text-slate-400 leading-tight">
-                Vector SLA: <strong className="text-slate-300">99.8%</strong> • Latency: <strong className="text-slate-300">180ms</strong>
+                {system?.aiConfigured
+                  ? 'Live AI answers enabled'
+                  : 'Template mode — add an AI key to enable live answers'}
               </p>
             </div>
           )}

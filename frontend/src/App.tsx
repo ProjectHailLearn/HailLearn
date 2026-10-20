@@ -12,12 +12,19 @@ import { MentorshipPage } from './pages/MentorshipPage';
 import { KnowledgeVaultPage } from './pages/KnowledgeVaultPage';
 import { CoursesPage } from './pages/CoursesPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { AdminPage } from './pages/AdminPage';
+import { ForgotPasswordPage, ResetPasswordPage } from './pages/PasswordResetPages';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { refetchOnWindowFocus: false, staleTime: 1000 * 60 * 5 },
   },
 });
+
+const AdminOnly: React.FC = () => {
+  const role = useAppSelector((s) => s.auth.user?.role);
+  return role === 'admin' ? <AdminPage /> : <Navigate to="/" replace />;
+};
 
 const ProtectedLayout: React.FC = () => {
   const isAuthenticated = useAppSelector((s) => s.auth.isAuthenticated);
@@ -31,6 +38,8 @@ export const App: React.FC = () => {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route element={<ProtectedLayout />}>
               <Route path="/" element={<DashboardOverview />} />
               <Route path="/doubts" element={<DoubtWorkspacePage />} />
@@ -38,6 +47,7 @@ export const App: React.FC = () => {
               <Route path="/knowledge" element={<KnowledgeVaultPage />} />
               <Route path="/courses" element={<CoursesPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/admin" element={<AdminOnly />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

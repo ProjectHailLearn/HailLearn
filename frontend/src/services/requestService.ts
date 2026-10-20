@@ -1,5 +1,14 @@
 import api from './api';
-import { MentorRequest } from '../types';
+import { MentorRequest, ChatMessage } from '../types';
+
+export const toMessage = (m: Record<string, unknown>): ChatMessage => ({
+  id: m._id as string,
+  requestId: m.requestId as string,
+  senderId: m.senderId as string,
+  senderName: m.senderName as string,
+  content: m.content as string,
+  createdAt: m.createdAt as string,
+});
 
 const toRequest = (r: Record<string, unknown>): MentorRequest => ({
   id: (r._id as string) || (r.id as string),
@@ -22,6 +31,14 @@ export const requestService = {
   create: async (payload: { mentorId: string; topic?: string; message: string }): Promise<MentorRequest> => {
     const res = await api.post('/requests', payload);
     return toRequest(res.data.data);
+  },
+  getMessages: async (id: string): Promise<ChatMessage[]> => {
+    const res = await api.get(`/requests/${id}/messages`);
+    return res.data.data.map(toMessage);
+  },
+  sendMessage: async (id: string, content: string): Promise<ChatMessage> => {
+    const res = await api.post(`/requests/${id}/messages`, { content });
+    return toMessage(res.data.data);
   },
   respond: async (id: string, status: 'ACCEPTED' | 'DECLINED'): Promise<MentorRequest> => {
     const res = await api.put(`/requests/${id}`, { status });

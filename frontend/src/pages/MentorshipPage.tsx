@@ -15,6 +15,9 @@ import { Avatar } from '../components/common/Avatar';
 import { Mentor, MentorRequest } from '../types';
 import { mentorService } from '../services/mentorService';
 import { requestService } from '../services/requestService';
+import { getSocket } from '../services/socketService';
+import { ChatPanel } from '../components/mentorship/ChatPanel';
+import { useSearchParams } from 'react-router-dom';
 
 export const MentorshipPage: React.FC = () => {
   const [mentors, setMentors] = useState<Mentor[]>([]);
@@ -23,7 +26,15 @@ export const MentorshipPage: React.FC = () => {
 
   useEffect(() => {
     mentorService.getAll().then(setMentors).catch(console.error);
+    const socket = getSocket();
+    const onPresence = ({ mentorId, isOnline }: { mentorId: string; isOnline: boolean }) =>
+      setMentors((prev) => prev.map((m) => (m.id === mentorId ? { ...m, isOnline } : m)));
+    socket?.on('mentors:presence', onPresence);
+    return () => { socket?.off('mentors:presence', onPresence); };
   }, []);
+
+  const [searchParams] = useSearchParams();
+  const [chatRequest, setChatRequest] = useState<MentorRequest | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [connectModalMentor, setConnectModalMentor] = useState<string | null>(null);
@@ -35,8 +46,25 @@ export const MentorshipPage: React.FC = () => {
   const [requestError, setRequestError] = useState<string | null>(null);
   const [requests, setRequests] = useState<{ sent: MentorRequest[]; received: MentorRequest[] }>({ sent: [], received: [] });
 
-  const loadRequests = () => requestService.getAll().then(setRequests).catch(console.error);
-  useEffect(() => { loadRequests(); }, []);
+  const loadRequests = () =>
+    requestService.getAll().then((r) => {
+      setRequests(r);
+      // Deep link from a notification: /mentorship?chat=<requestId>
+      const chatId = searchParams.get('chat');
+      const match = chatId && [...r.sent, ...r.received].find((x) => x.id === chatId && x.status === 'ACCEPTED');
+      if (match) setChatRequest(match);
+    }).catch(console.error);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadRequests(); }, [searchParams]);
+
+  // Refresh the lists when a request is created/accepted elsewhere.
+  useEffect(() => {
+    const socket = getSocket();
+    const onNotification = (n: { link?: string }) => { if (n.link?.startsWith('/mentorship')) loadRequests(); };
+    socket?.on('notification', onNotification);
+    return () => { socket?.off('notification', onNotification); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleRespond = async (id: string, status: 'ACCEPTED' | 'DECLINED') => {
     try {
@@ -148,6 +176,10 @@ export const MentorshipPage: React.FC = () => {
                       <Button size="sm" variant="gradient" className="text-xs" onClick={() => handleRespond(r.id, 'ACCEPTED')}>Accept</Button>
                       <Button size="sm" variant="ghost" className="text-xs" onClick={() => handleRespond(r.id, 'DECLINED')}>Decline</Button>
                     </div>
+                  ) : r.status === 'ACCEPTED' ? (
+                    <Button size="sm" variant="secondary" className="text-xs" leftIcon={<MessageSquare className="w-3.5 h-3.5" />} onClick={() => setChatRequest(r)}>
+                      Chat
+                    </Button>
                   ) : (
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusStyle[r.status]}`}>{r.status}</span>
                   )}
@@ -164,7 +196,14 @@ export const MentorshipPage: React.FC = () => {
                     <div className="text-xs font-semibold text-white">{r.mentorName}{r.topic && <span className="text-purple-300"> · {r.topic}</span>}</div>
                     <div className="text-[10px] text-slate-500">{r.createdAt}</div>
                   </div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusStyle[r.status]}`}>{r.status}</span>
+                  <div className="flex items-center gap-2">
+                    {r.status === 'ACCEPTED' && (
+                      <Button size="sm" variant="secondary" className="text-xs" leftIcon={<MessageSquare className="w-3.5 h-3.5" />} onClick={() => setChatRequest(r)}>
+                        Chat
+                      </Button>
+                    )}
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusStyle[r.status]}`}>{r.status}</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -289,12 +328,14 @@ export const MentorshipPage: React.FC = () => {
 
               <Button
                 size="sm"
-                variant="gradient"
+                variant={mentor.hasAccount ? 'gradient' : 'ghost'}
+                disabled={!mentor.hasAccount}
                 onClick={() => setConnectModalMentor(mentor.id)}
                 className="text-xs py-1.5"
                 leftIcon={<MessageSquare className="w-3.5 h-3.5" />}
+                title={mentor.hasAccount ? undefined : 'This mentor has not joined HailLearn yet'}
               >
-                Connect
+                {mentor.hasAccount ? 'Connect' : 'Not joined yet'}
               </Button>
             </div>
           </Card>
@@ -395,6 +436,7 @@ export const MentorshipPage: React.FC = () => {
           </div>
         </div>
       )}
+      {chatRequest && <ChatPanel request={chatRequest} onClose={() => setChatRequest(null)} />}
     </div>
   );
 };

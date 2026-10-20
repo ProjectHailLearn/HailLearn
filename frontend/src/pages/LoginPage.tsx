@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { GraduationCap, Sparkles, Eye, EyeOff, Flame, BookOpen, Users } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store';
 import { loginThunk, registerThunk, clearError } from '../store/slices/authSlice';
@@ -80,8 +80,8 @@ export const LoginPage: React.FC = () => {
         {/* Stats Strip */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           {[
-            { icon: BookOpen, label: '4 Courses', color: 'text-brand-400' },
-            { icon: Users, label: '18 Mentors', color: 'text-purple-400' },
+            { icon: BookOpen, label: 'AI Doubt Help', color: 'text-brand-400' },
+            { icon: Users, label: 'Peer Mentors', color: 'text-purple-400' },
             { icon: Flame, label: 'Karma System', color: 'text-amber-400' },
           ].map(({ icon: Icon, label, color }) => (
             <div key={label} className="flex flex-col items-center gap-1 p-3 bg-slate-900/60 border border-slate-800 rounded-xl">
@@ -140,7 +140,14 @@ export const LoginPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Password</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-slate-300">Password</label>
+                {mode === 'login' && (
+                  <Link to="/forgot-password" className="text-[11px] text-brand-400 hover:text-brand-300">
+                    Forgot password?
+                  </Link>
+                )}
+              </div>
               <div className="relative">
                 <input
                   name="password"

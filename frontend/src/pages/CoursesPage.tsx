@@ -9,6 +9,8 @@ import { Button } from '../components/common/Button';
 import { useNavigate } from 'react-router-dom';
 import { courseService } from '../services/courseService';
 import { Course } from '../types';
+import { useAppSelector } from '../store';
+import { apiError } from '../utils/errors';
 
 export const CoursesPage: React.FC = () => {
   const navigate = useNavigate();
@@ -32,6 +34,23 @@ export const CoursesPage: React.FC = () => {
       );
     } catch {
       setError('Failed to update enrollment');
+    }
+  };
+
+  const role = useAppSelector((st) => st.auth.user?.role);
+  const canEdit = role === 'faculty' || role === 'admin';
+  const [editing, setEditing] = useState<{ id: string; syllabusCovered: string; nextLecture: string } | null>(null);
+
+  const handleSaveEdit = async () => {
+    if (!editing) return;
+    setError(null);
+    try {
+      const payload = { syllabusCovered: Number(editing.syllabusCovered), nextLecture: editing.nextLecture };
+      await courseService.update(editing.id, payload);
+      setCourses((prev) => prev?.map((c) => (c.id === editing.id ? { ...c, ...payload } : c)) ?? null);
+      setEditing(null);
+    } catch (err) {
+      setError(apiError(err, 'Failed to update course'));
     }
   };
 
@@ -107,7 +126,17 @@ export const CoursesPage: React.FC = () => {
             <div className="space-y-2 pt-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-300 font-medium">Syllabus Covered</span>
-                <span className="font-mono font-bold text-brand-400">{course.syllabusCovered}%</span>
+                <span className="flex items-center gap-2">
+                  {canEdit && editing?.id !== course.id && (
+                    <button
+                      onClick={() => setEditing({ id: course.id, syllabusCovered: String(course.syllabusCovered), nextLecture: course.nextLecture })}
+                      className="text-[11px] text-slate-400 hover:text-brand-300"
+                    >
+                      Edit
+                    </button>
+                  )}
+                  <span className="font-mono font-bold text-brand-400">{course.syllabusCovered}%</span>
+                </span>
               </div>
               <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
                 <div
@@ -116,6 +145,26 @@ export const CoursesPage: React.FC = () => {
                 />
               </div>
             </div>
+
+            {canEdit && editing?.id === course.id && (
+              <div className="p-3 rounded-xl bg-slate-950/60 border border-brand-500/30 grid grid-cols-3 gap-2 text-xs">
+                <input
+                  type="number" min={0} max={100}
+                  value={editing.syllabusCovered}
+                  onChange={(e) => setEditing({ ...editing, syllabusCovered: e.target.value })}
+                  className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-100"
+                  title="Syllabus covered %"
+                />
+                <input
+                  value={editing.nextLecture}
+                  onChange={(e) => setEditing({ ...editing, nextLecture: e.target.value })}
+                  className="col-span-2 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-slate-100"
+                  placeholder="Next lecture"
+                />
+                <Button size="sm" variant="gradient" className="text-xs col-span-2" onClick={handleSaveEdit}>Save</Button>
+                <Button size="sm" variant="ghost" className="text-xs" onClick={() => setEditing(null)}>Cancel</Button>
+              </div>
+            )}
 
             {/* Personal progress */}
             <div className="space-y-2">

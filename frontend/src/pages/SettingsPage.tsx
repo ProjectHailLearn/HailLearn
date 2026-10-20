@@ -4,12 +4,14 @@ import {
   Cpu,
   Shield,
   CheckCircle2,
+  KeyRound,
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { useAppDispatch, useAppSelector } from '../store';
 import { updateProfile } from '../store/slices/authSlice';
 import { authService } from '../services/authService';
+import { apiError } from '../utils/errors';
 
 export const SettingsPage: React.FC = () => {
   const user = useAppSelector((state) => state.auth.user);
@@ -221,6 +223,69 @@ export const SettingsPage: React.FC = () => {
           </Button>
         </div>
       </form>
+
+      <ChangePasswordCard />
     </div>
+  );
+};
+
+const ChangePasswordCard: React.FC = () => {
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (next !== confirm) { setStatus({ ok: false, text: 'New passwords do not match' }); return; }
+    setSaving(true);
+    setStatus(null);
+    try {
+      await authService.changePassword(current, next);
+      setStatus({ ok: true, text: 'Password updated' });
+      setCurrent(''); setNext(''); setConfirm('');
+    } catch (err) {
+      setStatus({ ok: false, text: apiError(err, 'Failed to change password') });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputCls =
+    'w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-200 focus:outline-none focus:border-brand-500';
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <Card variant="glass" className="p-6 space-y-4">
+        <div className="flex items-center gap-2.5 pb-3 border-b border-slate-800">
+          <KeyRound className="w-5 h-5 text-amber-400" />
+          <div>
+            <h3 className="text-sm font-bold text-white">Change Password</h3>
+            <p className="text-xs text-slate-400">Use at least 6 characters</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">Current password</label>
+            <input type="password" required value={current} onChange={(e) => setCurrent(e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">New password</label>
+            <input type="password" required minLength={6} value={next} onChange={(e) => setNext(e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">Confirm new password</label>
+            <input type="password" required minLength={6} value={confirm} onChange={(e) => setConfirm(e.target.value)} className={inputCls} />
+          </div>
+        </div>
+        <div className="flex items-center justify-between">
+          {status ? (
+            <span className={`text-xs font-semibold ${status.ok ? 'text-emerald-400' : 'text-rose-400'}`}>{status.text}</span>
+          ) : <span />}
+          <Button type="submit" variant="secondary" size="md" isLoading={saving}>Update Password</Button>
+        </div>
+      </Card>
+    </form>
   );
 };
