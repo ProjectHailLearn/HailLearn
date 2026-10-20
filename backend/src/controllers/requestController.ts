@@ -12,6 +12,7 @@ export const createRequest = async (req: AuthRequest, res: Response): Promise<vo
       res.status(400).json({ success: false, message: 'mentorId and message are required' });
       return;
     }
+    if (!/^[a-f\d]{24}$/i.test(String(mentorId))) { res.status(400).json({ success: false, message: 'Invalid mentorId' }); return; }
     const [mentor, student] = await Promise.all([Mentor.findById(mentorId), User.findById(req.userId)]);
     if (!mentor || !student) { res.status(404).json({ success: false, message: 'Mentor not found' }); return; }
     if (mentor.userId === req.userId) {

@@ -13,7 +13,14 @@ export interface SolveInput {
   courseCode: string;
   university?: string;
   preferredModel?: string;
+  depth?: 'detailed' | 'concise' | 'socratic';
 }
+
+const DEPTH_INSTRUCTIONS: Record<NonNullable<SolveInput['depth']>, string> = {
+  detailed: 'Give an exhaustive step-by-step solution with 3-5 steps, including code where helpful.',
+  concise: 'Give a concise solution in 2 short steps.',
+  socratic: 'Do NOT give the final answer. Give 3 guiding hints/questions as steps that lead the student to solve it themselves.',
+};
 
 export interface SolveResult {
   aiSolution: AiSolution;
@@ -24,7 +31,7 @@ export interface SolveResult {
 const buildPrompt = (input: SolveInput): string => `You are HailLearn, an expert university tutor for ${input.subject} (${input.courseCode}).
 Solve the student's doubt step by step. Respond ONLY with JSON (no markdown fences) of this exact shape:
 {"summary": string, "confidence": number (0-100), "steps": [{"step": number, "title": string, "content": string, "codeSnippet"?: string, "language"?: string}], "citations": string[], "suggestedReadings": string[]}
-Use 2-5 steps.
+${DEPTH_INSTRUCTIONS[input.depth || 'detailed']}
 
 Title: ${input.title}
 Question: ${input.description}

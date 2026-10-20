@@ -19,6 +19,12 @@ export const getStats = async (req: AuthRequest, res: Response): Promise<void> =
       User.findById(req.userId),
     ]);
 
+    const karma = user?.karmaPoints ?? 0;
+    const [usersAbove, totalUsers] = await Promise.all([
+      User.countDocuments({ karmaPoints: { $gt: karma } }),
+      User.countDocuments(),
+    ]);
+
     const statusCounts = Object.fromEntries(byStatus.map((s) => [s._id, s.count])) as Record<string, number>;
     const total = byStatus.reduce((sum, s) => sum + s.count, 0);
     const aiResolved = statusCounts.AI_RESOLVED || 0;
@@ -35,7 +41,9 @@ export const getStats = async (req: AuthRequest, res: Response): Promise<void> =
         onlineMentors,
         knowledgeItems,
         myDoubts,
-        karmaPoints: user?.karmaPoints ?? 0,
+        karmaPoints: karma,
+        karmaRank: usersAbove + 1,
+        totalUsers,
         doubtsByCourse: Object.fromEntries(byCourse.map((c) => [c._id, c.count])),
       },
     });

@@ -33,3 +33,12 @@ export const authorize =
     }
     next();
   };
+
+// Rejects malformed :id params with 400 instead of letting Mongoose throw a CastError (500).
+export const validateObjectId = (_req: Request, res: Response, next: NextFunction, id: string): void => {
+  if (!/^[a-f\d]{24}$/i.test(id)) {
+    res.status(400).json({ success: false, message: 'Invalid id' });
+    return;
+  }
+  next();
+};

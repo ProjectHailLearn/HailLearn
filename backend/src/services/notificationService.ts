@@ -1,4 +1,5 @@
 import { Notification, INotification } from '../models/Notification.js';
+import { emitToUser } from '../socket/index.js';
 
 export const notify = async (
   userId: string | undefined,
@@ -6,7 +7,8 @@ export const notify = async (
 ): Promise<void> => {
   if (!userId) return;
   try {
-    await Notification.create({ userId, ...payload });
+    const doc = await Notification.create({ userId, ...payload });
+    emitToUser(userId, 'notification', doc);
   } catch (err) {
     console.error('[notify] failed:', (err as Error).message);
   }

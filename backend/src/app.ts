@@ -7,6 +7,8 @@ import doubtRoutes from './routes/doubtRoutes.js';
 import mentorRoutes from './routes/mentorRoutes.js';
 import knowledgeRoutes from './routes/knowledgeRoutes.js';
 import requestRoutes from './routes/requestRoutes.js';
+import courseRoutes from './routes/courseRoutes.js';
+import roomRoutes from './routes/roomRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import { getStats } from './controllers/statsController.js';
 import { protect } from './middlewares/auth.js';
@@ -53,6 +55,8 @@ export const createApp = (): Express => {
   app.use('/api/mentors', mentorRoutes);
   app.use('/api/knowledge', knowledgeRoutes);
   app.use('/api/requests', requestRoutes);
+  app.use('/api/courses', courseRoutes);
+  app.use('/api/rooms', roomRoutes);
   app.use('/api/notifications', notificationRoutes);
   app.get('/api/stats', protect, getStats);
 

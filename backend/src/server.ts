@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import { createApp } from './app.js';
 import { connectDB } from './config/database.js';
 import { seedDatabase } from './utils/seed.js';
+import { initSocket } from './socket/index.js';
 
 dotenv.config();
 
@@ -14,6 +15,7 @@ const start = async () => {
 
   const app = createApp();
   const server = http.createServer(app);
+  initSocket(server);
 
   server.listen(PORT, () => {
     console.log(`=========================================`);

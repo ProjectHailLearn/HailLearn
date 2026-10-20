@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import { getNotifications, markRead, markAllRead } from '../controllers/notificationController.js';
-import { protect } from '../middlewares/auth.js';
+import { protect, validateObjectId } from '../middlewares/auth.js';
 
 const router = Router();
+router.use(protect);
+router.param('id', validateObjectId);
 
-router.get('/', protect, getNotifications);
-router.put('/read-all', protect, markAllRead);
-router.put('/:id/read', protect, markRead);
+router.get('/', getNotifications);
+router.put('/read-all', markAllRead);
+router.put('/:id/read', markRead);
 
 export default router;

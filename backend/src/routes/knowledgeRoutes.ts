@@ -1,9 +1,14 @@
 import { Router } from 'express';
-import { getKnowledgeItems } from '../controllers/knowledgeController.js';
-import { protect } from '../middlewares/auth.js';
+import { getKnowledgeItems, getCategories, toggleUpvote, recordView } from '../controllers/knowledgeController.js';
+import { protect, validateObjectId } from '../middlewares/auth.js';
 
 const router = Router();
+router.use(protect);
+router.param('id', validateObjectId);
 
-router.get('/', protect, getKnowledgeItems);
+router.get('/', getKnowledgeItems);
+router.get('/categories', getCategories);
+router.put('/:id/upvote', toggleUpvote);
+router.put('/:id/view', recordView);
 
 export default router;

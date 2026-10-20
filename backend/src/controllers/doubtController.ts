@@ -39,7 +39,7 @@ export const getDoubt = async (req: AuthRequest, res: Response): Promise<void> =
 
 export const createDoubt = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { title, description, codeSnippet, subject, courseCode, tags } = req.body;
+    const { title, description, codeSnippet, subject, courseCode, tags, depth } = req.body;
     if (!title || !description || !subject || !courseCode) {
       res.status(400).json({ success: false, message: 'title, description, subject and courseCode are required' });
       return;
@@ -51,6 +51,7 @@ export const createDoubt = async (req: AuthRequest, res: Response): Promise<void
     const { aiSolution, aiConfidenceScore, source } = await solveDoubt({
       title, description, codeSnippet, subject, courseCode, university: user.university,
       preferredModel: user.preferences?.aiModel,
+      depth,
     });
 
     const doubt = await Doubt.create({
@@ -73,7 +74,7 @@ export const createDoubt = async (req: AuthRequest, res: Response): Promise<void
       type: 'ai',
       title: source === 'fallback' ? 'Doubt received' : 'AI solved your doubt',
       message: `"${title}" — ${source === 'fallback' ? 'a guided outline is ready; escalate for a mentor answer.' : `solution ready (${aiConfidenceScore}% confidence).`}`,
-      link: '/doubts',
+      link: `/doubts?id=${doubt._id}`,
     });
 
     res.status(201).json({ success: true, data: doubt });
@@ -103,7 +104,9 @@ export const upvoteDoubt = async (req: AuthRequest, res: Response): Promise<void
 
 export const escalateDoubt = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const mentor = await Mentor.findById(req.body.mentorId);
+    const mentorId = String(req.body.mentorId || '');
+    if (!/^[a-f\d]{24}$/i.test(mentorId)) { res.status(400).json({ success: false, message: 'Valid mentorId is required' }); return; }
+    const mentor = await Mentor.findById(mentorId);
     if (!mentor) { res.status(404).json({ success: false, message: 'Mentor not found' }); return; }
 
     const doubt = await Doubt.findByIdAndUpdate(
@@ -120,13 +123,13 @@ export const escalateDoubt = async (req: AuthRequest, res: Response): Promise<vo
       type: 'mentor',
       title: 'New doubt assigned to you',
       message: `${doubt.author.name} escalated "${doubt.title}" (${doubt.courseCode}).`,
-      link: '/doubts',
+      link: `/doubts?id=${doubt._id}`,
     });
     await notify(doubt.author.id, {
       type: 'mentor',
       title: 'Escalated to mentor',
       message: `${mentor.name} has been assigned to "${doubt.title}".`,
-      link: '/doubts',
+      link: `/doubts?id=${doubt._id}`,
     });
     res.json({ success: true, data: doubt });
   } catch {
@@ -160,7 +163,7 @@ export const answerDoubt = async (req: AuthRequest, res: Response): Promise<void
       type: 'mentor',
       title: 'New answer on your doubt',
       message: `${user.name} answered "${existing.title}".`,
-      link: '/doubts',
+      link: `/doubts?id=${existing._id}`,
     });
     res.json({ success: true, data: doubt });
   } catch (err) {

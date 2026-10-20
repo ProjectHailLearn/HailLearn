@@ -1,6 +1,15 @@
 import { Mentor } from '../models/Mentor.js';
 import { KnowledgeItem } from '../models/KnowledgeItem.js';
 import { Doubt } from '../models/Doubt.js';
+import { Course } from '../models/Course.js';
+import { StudyRoom } from '../models/StudyRoom.js';
+
+const SEED_COURSES = [
+  { code: 'CS201', title: 'Advanced Data Structures & Algorithms', subject: 'Data Structures & Algorithms', instructor: 'Prof. Thomas Cormen', credits: 4, category: 'Computer Science', syllabusCovered: 82, nextLecture: 'Tomorrow, 10:00 AM (Room 302)', baseEnrollment: 240 },
+  { code: 'CS305', title: 'Distributed Systems & Cloud Computing', subject: 'Distributed Systems', instructor: 'Dr. Sarah Jenkins', credits: 4, category: 'Systems', syllabusCovered: 68, nextLecture: 'Thursday, 02:00 PM (Lab 4B)', baseEnrollment: 180 },
+  { code: 'AI401', title: 'Deep Neural Architectures & LLMs', subject: 'Deep Learning & LLMs', instructor: 'Prof. Andrew Ng Group', credits: 4, category: 'AI & Data Science', syllabusCovered: 90, nextLecture: 'Friday, 11:30 AM (Auditorium 1)', baseEnrollment: 310 },
+  { code: 'CS245', title: 'Database Architecture & Internals', subject: 'Database Architecture', instructor: 'Prof. Jennifer Widom', credits: 3, category: 'Data Engineering', syllabusCovered: 55, nextLecture: 'Monday, 09:00 AM (Online Room)', baseEnrollment: 195 },
+];
 
 const SEED_MENTORS = [
   {
@@ -157,6 +166,22 @@ export const seedDatabase = async (): Promise<void> => {
   if (knowledgeCount === 0) {
     await KnowledgeItem.insertMany(SEED_KNOWLEDGE);
     console.log('Seeded knowledge items');
+  }
+
+  const courseCount = await Course.countDocuments();
+  if (courseCount === 0) {
+    await Course.insertMany(SEED_COURSES);
+    console.log('Seeded courses');
+  }
+
+  const roomCount = await StudyRoom.countDocuments();
+  if (roomCount === 0) {
+    const now = Date.now();
+    await StudyRoom.insertMany([
+      { title: 'Raft Consensus Proof Walkthrough', courseCode: 'CS305', hostId: 'seed', hostName: 'Dr. Sarah Jenkins', scheduledAt: new Date(now - 10 * 60000), durationMins: 120 },
+      { title: 'Dynamic Programming Problem Jam', courseCode: 'CS201', hostId: 'seed', hostName: 'Devon Vance (TA)', scheduledAt: new Date(now + 3 * 3600000), durationMins: 90 },
+    ]);
+    console.log('Seeded study rooms');
   }
 
   const doubtCount = await Doubt.countDocuments();
