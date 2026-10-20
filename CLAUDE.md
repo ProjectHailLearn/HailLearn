@@ -41,7 +41,9 @@ HTTP Request → Route → Middleware (protect) → Controller → Model → Res
 ```
 Controllers live in `src/controllers/`, routes in `src/routes/`. Controllers call Mongoose models directly (no repository layer). Cross-cutting logic lives in `src/services/` (`aiService` — Gemini/Grok with fallback; `notificationService.notify()` — persists + pushes via Socket.IO). Request bodies are validated with zod schemas in `src/validators/index.ts` via `validate(schema)`. Protected routers use `router.use(protect)` then `router.param('id', validateObjectId)`; role checks use `authorize(...roles)`.
 
-Socket.IO (`src/socket/index.ts`) authenticates with the JWT in `handshake.auth.token`; each user joins `user:<id>`. Events: `notification`, `rooms:changed`.
+Socket.IO (`src/socket/index.ts`) authenticates with the JWT in `handshake.auth.token`; each user joins `user:<id>`. Events: `notification`, `rooms:changed`, `message` (mentor chat), `mentors:presence`. Mentor `isOnline` is driven by live socket connections and reset to false at startup.
+
+Admins come from `ADMIN_EMAILS` (promoted at startup and signup); admin routes live under `/api/admin`. Without SMTP config, `services/emailService.ts` logs emails to the console.
 
 ### Authentication
 - JWT is signed with `JWT_SECRET` and embeds `{ userId, role }`.
