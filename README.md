@@ -77,18 +77,65 @@ HailLearn/
 ```bash
 cd backend
 npm install
-cp .env.example .env   # Configure your environment variables
+cp .env.example .env   # set MONGODB_URI, JWT_SECRET (and optionally the AI key)
 npm run dev
 ```
-Backend API will be live on `http://localhost:5000` (Health Check: `http://localhost:5000/health`).
+Backend API runs on `http://localhost:5001` (health check: `/health`). On first start it seeds mentors, courses, study rooms, knowledge items and sample doubts.
 
 ### 2. Frontend Setup
 ```bash
 cd frontend
 npm install
+cp .env.example .env   # optional: VITE_API_URL if the API isn't on localhost:5001
 npm run dev
 ```
-Frontend Web App will be live on `http://localhost:5173`.
+Frontend runs on `http://localhost:5173`. Sign up as **student**, **mentor** or **faculty**; mentor/faculty accounts automatically get a public mentor profile.
+
+### 3. AI Provider (optional)
+Doubts are answered by Gemini or Grok. Without a key, a structured template answer is returned so the app still works end to end.
+```bash
+# backend/.env
+AI_PROVIDER=gemini        # or grok
+AI_API_KEY=your_key
+AI_MODEL=                 # optional override (defaults: gemini-1.5-flash / grok-2-latest)
+```
+
+### 4. Quality Checks
+```bash
+cd backend && npm test && npm run lint
+cd frontend && npm run lint && npm run build
+```
+
+---
+
+## ✨ Features
+- **AI Doubt Studio**: ask a question with optional code; AI returns step-by-step reasoning (detailed, concise, or Socratic hints).
+- **Doubt lifecycle**: `AI_RESOLVED → MENTOR_ESCALATED → FACULTY_VERIFIED → CLOSED`, with mentor/faculty answers and role-based permissions.
+- **Knowledge Vault**: faculty-verified doubts are published automatically; search, filter by category, upvote, view counts.
+- **Mentorship**: browse mentors, send 1-on-1 requests, mentors accept/decline.
+- **Courses**: enroll, open-doubt counts per course, personal progress.
+- **Study Rooms**: host or join scheduled/live peer sessions with optional meeting links.
+- **Real-time notifications** over Socket.IO (JWT-authenticated), karma points and campus rank.
+
+## 🔌 API Reference
+All routes except register/login require `Authorization: Bearer <token>`.
+
+| Method | Route | Notes |
+|---|---|---|
+| POST | `/api/auth/register`, `/api/auth/login` | roles: student, mentor, faculty |
+| GET/PUT | `/api/auth/me` | profile + preferences |
+| GET/POST | `/api/doubts` | filters: `status`, `mine`, `courseCode`, `search`; POST runs the AI |
+| GET | `/api/doubts/:id` | increments views |
+| PUT | `/api/doubts/:id/upvote` · `/escalate` · `/close` | upvote once per user |
+| POST | `/api/doubts/:id/answer` | mentor/faculty/admin |
+| PUT | `/api/doubts/:id/verify` | faculty/admin; publishes to Knowledge Vault |
+| GET | `/api/mentors` | |
+| GET/POST, PUT | `/api/requests`, `/api/requests/:id` | mentorship requests; accept/decline |
+| GET, PUT | `/api/knowledge`, `/categories`, `/:id/upvote`, `/:id/view` | |
+| GET, PUT | `/api/courses`, `/api/courses/:id/enroll` | |
+| GET/POST, PUT, DELETE | `/api/rooms`, `/:id/join`, `/:id` | study rooms |
+| GET, PUT | `/api/notifications`, `/:id/read`, `/read-all` | also pushed via Socket.IO `notification` |
+| GET | `/api/stats` | dashboard metrics, karma rank |
 
 ---
 
