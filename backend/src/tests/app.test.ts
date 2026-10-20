@@ -37,6 +37,11 @@ describe('HTTP app', () => {
     expect(res.body.message).toMatch(/name/);
   });
 
+  it('rejects malformed reset tokens', async () => {
+    const res = await request(app).post('/api/auth/reset-password').send({ token: 'abc', password: 'secret12' });
+    expect(res.status).toBe(400);
+  });
+
   it('validates login input', async () => {
     expect((await request(app).post('/api/auth/login').send({ email: 'nope' })).status).toBe(400);
   });
@@ -55,6 +60,27 @@ describe('HTTP app', () => {
         .set('Authorization', `Bearer ${token()}`)
         .send({ content: 'hi' });
       expect(res.status).toBe(403);
+    });
+
+    it('restricts the admin API to admins', async () => {
+      const res = await request(app).get('/api/admin/users').set('Authorization', `Bearer ${token()}`);
+      expect(res.status).toBe(403);
+    });
+
+    it('forbids students from editing courses', async () => {
+      const res = await request(app)
+        .put('/api/courses/6ad73a1339df3b78709785bc')
+        .set('Authorization', `Bearer ${token()}`)
+        .send({ syllabusCovered: 50 });
+      expect(res.status).toBe(403);
+    });
+
+    it('validates chat messages', async () => {
+      const res = await request(app)
+        .post('/api/requests/6ad73a1339df3b78709785bc/messages')
+        .set('Authorization', `Bearer ${token()}`)
+        .send({ content: '   ' });
+      expect(res.status).toBe(400);
     });
 
     it('validates doubt creation before hitting the database', async () => {

@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+import { sendEmail } from '../services/emailService.js';
 import { User, IUser } from '../models/User.js';
 import { Mentor } from '../models/Mentor.js';
 import { AuthRequest } from '../middlewares/auth.js';
@@ -25,7 +27,7 @@ const toPublicUser = (user: IUser) => ({
 });
 
 // Mentor/faculty users get a Mentor profile so students can find and request them.
-const syncMentorProfile = async (user: IUser): Promise<void> => {
+export const syncMentorProfile = async (user: IUser): Promise<void> => {
   if (user.role !== 'mentor' && user.role !== 'faculty') return;
   await Mentor.findOneAndUpdate(
     { userId: user._id.toString() },
@@ -39,7 +41,7 @@ const syncMentorProfile = async (user: IUser): Promise<void> => {
       },
       $setOnInsert: {
         year: user.role === 'faculty' ? 'Faculty Mentor' : 'Peer Mentor',
-        isOnline: true,
+        isOnline: false,
         bio: `${user.name} mentors students in ${user.department}.`,
       },
     },
@@ -58,7 +60,10 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Admin cannot be self-assigned at signup.
-    const safeRole = ['student', 'mentor', 'faculty'].includes(role) ? role : 'student';
+    const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase());
+    const safeRole = adminEmails.includes(String(email).toLowerCase())
+      ? 'admin'
+      : ['student', 'mentor', 'faculty'].includes(role) ? role : 'student';
     const user = await User.create({ name, email, password, role: safeRole, university, department, semester });
     await syncMentorProfile(user);
     await notify(user._id.toString(), {
@@ -134,5 +139,69 @@ export const updateMe = async (req: AuthRequest, res: Response): Promise<void> =
     res.json({ success: true, data: { user: toPublicUser(user) } });
   } catch (err) {
     res.status(400).json({ success: false, message: 'Failed to update profile', error: (err as Error).message });
+  }
+};
+
+const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
+
+// Always responds the same way so the endpoint can't be used to discover accounts.
+export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
+  const generic = { success: true, message: 'If that email is registered, a reset link has been sent.' };
+  try {
+    const user = await User.findOne({ email: req.body.email });
+    if (!user) { res.json(generic); return; }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    await User.updateOne(
+      { _id: user._id },
+      { passwordResetHash: hashToken(token), passwordResetExpires: new Date(Date.now() + 60 * 60000) }
+    );
+    const link = `${process.env.CLIENT_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
+    await sendEmail(
+      user.email,
+      'Reset your HailLearn password',
+      `Hi ${user.name},\n\nReset your password using this link (valid for 1 hour):\n${link}\n\nIf you didn't request this, you can ignore this email.`
+    );
+    res.json(generic);
+  } catch {
+    res.status(500).json({ success: false, message: 'Failed to start password reset' });
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token, password } = req.body;
+    const user = await User.findOne({
+      passwordResetHash: hashToken(token),
+      passwordResetExpires: { $gt: new Date() },
+    }).select('+passwordResetHash +passwordResetExpires');
+    if (!user) {
+      res.status(400).json({ success: false, message: 'Reset link is invalid or has expired' });
+      return;
+    }
+    user.password = password;
+    user.passwordResetHash = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
+    const jwtToken = signToken(user._id.toString(), user.role);
+    res.json({ success: true, data: { token: jwtToken, user: toPublicUser(user) } });
+  } catch {
+    res.status(500).json({ success: false, message: 'Failed to reset password' });
+  }
+};
+
+export const changePassword = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.userId).select('+password');
+    if (!user || !(await user.comparePassword(currentPassword))) {
+      res.status(400).json({ success: false, message: 'Current password is incorrect' });
+      return;
+    }
+    user.password = newPassword;
+    await user.save();
+    res.json({ success: true, message: 'Password updated' });
+  } catch {
+    res.status(500).json({ success: false, message: 'Failed to change password' });
   }
 };

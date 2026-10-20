@@ -14,6 +14,8 @@ export interface IUser extends Document {
   specializations: string[];
   rating?: number;
   preferences: { aiModel: string; emailNotifications: boolean };
+  passwordResetHash?: string;
+  passwordResetExpires?: Date;
   comparePassword(candidate: string): Promise<boolean>;
 }
 
@@ -34,6 +36,8 @@ const UserSchema = new Schema<IUser>(
       aiModel: { type: String, default: 'gemini-1.5-flash' },
       emailNotifications: { type: Boolean, default: true },
     },
+    passwordResetHash: { type: String, select: false },
+    passwordResetExpires: { type: Date, select: false },
   },
   { timestamps: true }
 );

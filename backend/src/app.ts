@@ -9,6 +9,8 @@ import knowledgeRoutes from './routes/knowledgeRoutes.js';
 import requestRoutes from './routes/requestRoutes.js';
 import courseRoutes from './routes/courseRoutes.js';
 import roomRoutes from './routes/roomRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
+import { Mentor } from './models/Mentor.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import { getStats } from './controllers/statsController.js';
 import { protect } from './middlewares/auth.js';
@@ -57,6 +59,13 @@ export const createApp = (): Express => {
   app.use('/api/requests', requestRoutes);
   app.use('/api/courses', courseRoutes);
   app.use('/api/rooms', roomRoutes);
+  app.use('/api/admin', adminRoutes);
+  app.get('/api/system', protect, async (_req: Request, res: Response) => {
+    const provider = (process.env.AI_PROVIDER || '').toLowerCase();
+    const aiConfigured = !!process.env.AI_API_KEY && (provider === 'gemini' || provider === 'grok');
+    const onlineMentors = await Mentor.countDocuments({ isOnline: true }).catch(() => 0);
+    res.json({ success: true, data: { aiProvider: aiConfigured ? provider : 'fallback', aiConfigured, onlineMentors } });
+  });
   app.use('/api/notifications', notificationRoutes);
   app.get('/api/stats', protect, getStats);
 

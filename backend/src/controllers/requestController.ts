@@ -4,6 +4,8 @@ import { Mentor } from '../models/Mentor.js';
 import { User } from '../models/User.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { notify } from '../services/notificationService.js';
+import { Message } from '../models/Message.js';
+import { emitToUser } from '../socket/index.js';
 
 export const createRequest = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -15,6 +17,10 @@ export const createRequest = async (req: AuthRequest, res: Response): Promise<vo
     if (!/^[a-f\d]{24}$/i.test(String(mentorId))) { res.status(400).json({ success: false, message: 'Invalid mentorId' }); return; }
     const [mentor, student] = await Promise.all([Mentor.findById(mentorId), User.findById(req.userId)]);
     if (!mentor || !student) { res.status(404).json({ success: false, message: 'Mentor not found' }); return; }
+    if (!mentor.userId) {
+      res.status(400).json({ success: false, message: `${mentor.name} hasn't joined HailLearn yet` });
+      return;
+    }
     if (mentor.userId === req.userId) {
       res.status(400).json({ success: false, message: 'You cannot request yourself' });
       return;
@@ -73,10 +79,56 @@ export const respondToRequest = async (req: AuthRequest, res: Response): Promise
       type: 'mentor',
       title: status === 'ACCEPTED' ? 'Mentor accepted your request' : 'Mentor declined your request',
       message: `${request.mentorName} ${status === 'ACCEPTED' ? 'accepted' : 'declined'} your request${request.topic ? ` on ${request.topic}` : ''}.`,
-      link: '/mentorship',
+      link: status === 'ACCEPTED' ? `/mentorship?chat=${request._id}` : '/mentorship',
     });
     res.json({ success: true, data: request });
   } catch {
     res.status(500).json({ success: false, message: 'Failed to update request' });
+  }
+};
+
+// Chat is open only on accepted requests, between the student and the mentor's user account.
+const loadChat = async (req: AuthRequest, res: Response) => {
+  const request = await MentorRequest.findById(req.params.id);
+  if (!request || (request.studentId !== req.userId && request.mentorUserId !== req.userId)) {
+    res.status(404).json({ success: false, message: 'Conversation not found' });
+    return null;
+  }
+  if (request.status !== 'ACCEPTED') {
+    res.status(400).json({ success: false, message: 'Chat opens once the mentor accepts the request' });
+    return null;
+  }
+  return request;
+};
+
+export const getMessages = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const request = await loadChat(req, res);
+    if (!request) return;
+    const messages = await Message.find({ requestId: request._id.toString() }).sort({ createdAt: 1 }).limit(500);
+    res.json({ success: true, data: messages });
+  } catch {
+    res.status(500).json({ success: false, message: 'Failed to load messages' });
+  }
+};
+
+export const sendMessage = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const request = await loadChat(req, res);
+    if (!request) return;
+    const sender = await User.findById(req.userId);
+    if (!sender) { res.status(404).json({ success: false, message: 'User not found' }); return; }
+
+    const message = await Message.create({
+      requestId: request._id.toString(),
+      senderId: sender._id.toString(),
+      senderName: sender.name,
+      content: req.body.content,
+    });
+    const otherId = request.studentId === req.userId ? request.mentorUserId : request.studentId;
+    if (otherId) emitToUser(otherId, 'message', message);
+    res.status(201).json({ success: true, data: message });
+  } catch {
+    res.status(500).json({ success: false, message: 'Failed to send message' });
   }
 };
