@@ -23,3 +23,13 @@ export const protect = (req: AuthRequest, res: Response, next: NextFunction): vo
     res.status(401).json({ success: false, message: 'Invalid or expired token' });
   }
 };
+
+export const authorize =
+  (...roles: string[]) =>
+  (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (!req.userRole || !roles.includes(req.userRole)) {
+      res.status(403).json({ success: false, message: 'You do not have permission for this action' });
+      return;
+    }
+    next();
+  };
