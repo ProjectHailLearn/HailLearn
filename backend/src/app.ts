@@ -20,6 +20,8 @@ import { protect } from './middlewares/auth.js';
 export const createApp = (): Express => {
   const app: Express = express();
 
+  // Behind one proxy (Vercel/load balancer): use X-Forwarded-For so rate limits are per client, not per proxy.
+  app.set('trust proxy', 1);
   app.use(helmet());
   app.use(
     cors({
