@@ -46,3 +46,6 @@ build/
 # Test coverage
 coverage/
 .nyc_output/
+
+# Emitted by tsc -b in the frontend build
+frontend/vite.config.js
