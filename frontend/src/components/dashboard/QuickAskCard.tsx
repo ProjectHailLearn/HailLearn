@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Sparkles, ArrowRight, Layers, CheckCircle2 } from 'lucide-react';
+import { Sparkles, ArrowRight, Layers, CheckCircle2, BookOpen, RotateCcw } from 'lucide-react';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { addDoubt } from '../../store/slices/doubtSlice';
 import { doubtService } from '../../services/doubtService';
 import { courseService } from '../../services/courseService';
-import { Course } from '../../types';
+import { Course, Doubt } from '../../types';
 import { useNavigate } from 'react-router-dom';
 
 export const QuickAskCard: React.FC = () => {
@@ -18,7 +18,7 @@ export const QuickAskCard: React.FC = () => {
   const [subject, setSubject] = useState('Data Structures & Algorithms');
   const [courseCode, setCourseCode] = useState('CS201');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submittedId, setSubmittedId] = useState<string | null>(null);
+  const [answer, setAnswer] = useState<Doubt | null>(null);
 
   const [courses, setCourses] = useState<Course[]>([]);
 
@@ -26,7 +26,6 @@ export const QuickAskCard: React.FC = () => {
     courseService.getAll().then(setCourses).catch(console.error);
   }, []);
 
-  const [confidence, setConfidence] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleQuickSubmit = async (e: React.FormEvent) => {
@@ -44,8 +43,7 @@ export const QuickAskCard: React.FC = () => {
         tags: [subject.split(' ')[0], 'QuickAsk', courseCode],
       });
       dispatch(addDoubt(newDoubt));
-      setConfidence(newDoubt.aiConfidenceScore ?? null);
-      setSubmittedId(newDoubt.id);
+      setAnswer(newDoubt);
     } catch (err) {
       setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to submit question');
     } finally {
@@ -74,31 +72,85 @@ export const QuickAskCard: React.FC = () => {
         </div>
       </div>
 
-      {submittedId ? (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between animate-in fade-in">
-          <div className="flex items-center gap-3">
-            <CheckCircle2 className="w-6 h-6 text-emerald-400 flex-shrink-0" />
-            <div>
-              <div className="text-sm font-semibold text-emerald-200">
-                Doubt Analyzed{confidence !== null ? ` — ${confidence}% Confidence` : ''}!
-              </div>
-              <div className="text-xs text-emerald-400/80">
-                Step-by-step derivation and citations are ready in your workspace.
-              </div>
-            </div>
+      {answer ? (
+        <div className="space-y-3 animate-in fade-in">
+          <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300">
+            <span className="font-semibold text-slate-400">Your question: </span>
+            {answer.description}
           </div>
-          <Button
-            size="sm"
-            variant="gradient"
-            onClick={() => {
-              setSubmittedId(null);
-              setQuestion('');
-              navigate(`/doubts?id=${submittedId}`);
-            }}
-            rightIcon={<ArrowRight className="w-4 h-4" />}
-          >
-            Open in Studio
-          </Button>
+
+          {answer.aiSolution ? (
+            <>
+              <div className="p-4 rounded-xl bg-brand-950/40 border border-brand-500/30 text-sm text-slate-200 leading-relaxed">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <strong className="text-brand-300 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    AI Answer
+                  </strong>
+                  {answer.aiConfidenceScore != null && (
+                    <span className="text-[11px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                      {answer.aiConfidenceScore}% Confidence
+                    </span>
+                  )}
+                </div>
+                {answer.aiSolution.summary}
+              </div>
+
+              <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                {answer.aiSolution.steps.map((step) => (
+                  <div key={step.step} className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
+                      <span className="w-5 h-5 rounded-full bg-brand-600 text-white flex items-center justify-center text-[10px] font-mono flex-shrink-0">
+                        {step.step}
+                      </span>
+                      <span>{step.title}</span>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed pl-7 whitespace-pre-line">{step.content}</p>
+                    {step.codeSnippet && (
+                      <pre className="ml-7 bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs font-mono text-brand-300 overflow-x-auto">
+                        <code>{step.codeSnippet}</code>
+                      </pre>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {answer.aiSolution.citations.length > 0 && (
+                <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800 space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
+                    <BookOpen className="w-3.5 h-3.5 text-brand-400" />
+                    <span>References</span>
+                  </div>
+                  <ul className="list-disc list-inside text-xs text-slate-400 space-y-0.5">
+                    {answer.aiSolution.citations.map((cite, idx) => <li key={idx}>{cite}</li>)}
+                  </ul>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400">
+              Your doubt was saved. Open it in the studio to follow its progress.
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => { setAnswer(null); setQuestion(''); }}
+              leftIcon={<RotateCcw className="w-4 h-4" />}
+            >
+              Ask another
+            </Button>
+            <Button
+              size="sm"
+              variant="gradient"
+              onClick={() => navigate(`/doubts?id=${answer.id}`)}
+              rightIcon={<ArrowRight className="w-4 h-4" />}
+            >
+              Open in Studio
+            </Button>
+          </div>
         </div>
       ) : (
         <form onSubmit={handleQuickSubmit} className="space-y-3">
@@ -113,6 +165,12 @@ export const QuickAskCard: React.FC = () => {
           </div>
 
           {error && <div className="text-xs text-rose-400">{error}</div>}
+          {isSubmitting && (
+            <div className="flex items-center gap-2 text-xs text-brand-300">
+              <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+              AI is working on your answer — this usually takes 5–15 seconds…
+            </div>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
             <div className="flex items-center gap-2">
               {/* Course Selector */}
