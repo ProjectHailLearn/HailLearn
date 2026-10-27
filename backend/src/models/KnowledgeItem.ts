@@ -10,6 +10,9 @@ export interface IKnowledgeItem extends Document {
   views: number;
   tags: string[];
   snippet: string;
+  // Full answer shown when the item is opened; doubtId links items published from verified doubts.
+  content?: string;
+  doubtId?: string;
   similarityScore?: number;
   upvotedBy: string[];
 }
@@ -25,6 +28,8 @@ const KnowledgeItemSchema = new Schema<IKnowledgeItem>(
     views: { type: Number, default: 0 },
     tags: { type: [String], default: [] },
     snippet: { type: String, required: true },
+    content: { type: String },
+    doubtId: { type: String },
     similarityScore: { type: Number },
     upvotedBy: { type: [String], default: [] },
   },

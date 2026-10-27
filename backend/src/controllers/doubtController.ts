@@ -6,6 +6,7 @@ import { KnowledgeItem } from '../models/KnowledgeItem.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { solveDoubt } from '../services/aiService.js';
 import { notify } from '../services/notificationService.js';
+import { knowledgeContentFromDoubt } from '../utils/knowledge.js';
 
 const STATUSES = ['ANALYZING', 'AI_RESOLVED', 'MENTOR_ESCALATED', 'FACULTY_VERIFIED', 'CLOSED'];
 
@@ -189,6 +190,8 @@ export const verifyDoubt = async (req: AuthRequest, res: Response): Promise<void
           verificationBadge: true,
           tags: doubt.tags,
           snippet,
+          content: knowledgeContentFromDoubt(doubt),
+          doubtId: doubt._id.toString(),
         },
         $setOnInsert: { upvotes: doubt.upvotes, views: doubt.views },
       },

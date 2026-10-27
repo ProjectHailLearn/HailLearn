@@ -18,6 +18,8 @@ export const knowledgeService = {
         : 'Recently',
       tags: (k.tags as string[]) || [],
       snippet: k.snippet as string,
+      content: k.content as string | undefined,
+      doubtId: k.doubtId as string | undefined,
       similarityScore: k.similarityScore as number | undefined,
       hasUpvoted: (k.hasUpvoted as boolean) || false,
     }));

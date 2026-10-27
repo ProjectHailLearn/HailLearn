@@ -177,6 +177,8 @@ export interface KnowledgeItem {
   lastUpdated: string;
   tags: string[];
   snippet: string;
+  content?: string;
+  doubtId?: string;
   similarityScore?: number;
   hasUpvoted?: boolean;
 }

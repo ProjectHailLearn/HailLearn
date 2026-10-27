@@ -13,6 +13,7 @@ import { Card } from '../components/common/Card';
 import { KnowledgeItem } from '../types';
 import { knowledgeService } from '../services/knowledgeService';
 import { useSearchParams } from 'react-router-dom';
+import { KnowledgeReader } from '../components/knowledge/KnowledgeReader';
 
 export const KnowledgeVaultPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -20,7 +21,7 @@ export const KnowledgeVaultPage: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [filteredItems, setFilteredItems] = useState<KnowledgeItem[]>([]);
   const [categories, setCategories] = useState<string[]>(['ALL']);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
   const [viewed] = useState(() => new Set<string>());
 
   useEffect(() => {
@@ -31,7 +32,7 @@ export const KnowledgeVaultPage: React.FC = () => {
     setFilteredItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
 
   const handleOpen = (item: KnowledgeItem) => {
-    setExpandedId((cur) => (cur === item.id ? null : item.id));
+    setOpenId(item.id);
     // Count one view per item per visit.
     if (!viewed.has(item.id)) {
       viewed.add(item.id);
@@ -59,8 +60,12 @@ export const KnowledgeVaultPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchQuery, selectedCategory]);
 
+  const openItem = filteredItems.find((i) => i.id === openId);
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
+      {openItem && <KnowledgeReader item={openItem} onClose={() => setOpenId(null)} onUpvote={handleUpvote} />}
+
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -150,7 +155,7 @@ export const KnowledgeVaultPage: React.FC = () => {
               <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 transition flex-shrink-0" />
             </h3>
 
-            <p className={`text-xs text-slate-300 leading-relaxed mb-4 whitespace-pre-wrap ${expandedId === item.id ? '' : 'line-clamp-3'}`}>
+            <p className="text-xs text-slate-300 leading-relaxed mb-4 line-clamp-3">
               {item.snippet}
             </p>
 
