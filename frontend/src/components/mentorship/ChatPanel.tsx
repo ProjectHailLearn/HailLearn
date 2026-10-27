@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Send, X, MessageSquare } from 'lucide-react';
 import { requestService, toMessage } from '../../services/requestService';
-import { getSocket } from '../../services/socketService';
+import { getSocket, isSocketConnected } from '../../services/socketService';
 import { ChatMessage, MentorRequest } from '../../types';
 import { useAppSelector } from '../../store';
 import { apiError } from '../../utils/errors';
@@ -24,7 +24,17 @@ export const ChatPanel: React.FC<{ request: MentorRequest; onClose: () => void }
       if (msg.requestId === request.id) setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
     };
     socket?.on('message', onMessage);
-    return () => { socket?.off('message', onMessage); };
+    // Without a live socket (e.g. on Vercel), poll for new messages every 3 seconds.
+    const id = window.setInterval(() => {
+      if (isSocketConnected() || document.hidden) return;
+      requestService.getMessages(request.id).then((latest) =>
+        setMessages((prev) => (latest.length === prev.length && latest.every((m, i) => m.id === prev[i]?.id) ? prev : latest))
+      ).catch(() => {});
+    }, 3000);
+    return () => {
+      socket?.off('message', onMessage);
+      window.clearInterval(id);
+    };
   }, [request.id]);
 
   useEffect(() => {
@@ -38,7 +48,7 @@ export const ChatPanel: React.FC<{ request: MentorRequest; onClose: () => void }
     setError(null);
     try {
       const msg = await requestService.sendMessage(request.id, text.trim());
-      setMessages((prev) => [...prev, msg]);
+      setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
       setText('');
     } catch (err) {
       setError(apiError(err, 'Failed to send'));

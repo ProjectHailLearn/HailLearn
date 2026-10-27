@@ -4,6 +4,7 @@ import { Mentor } from '../models/Mentor.js';
 import { KnowledgeItem } from '../models/KnowledgeItem.js';
 import { User } from '../models/User.js';
 import { AuthRequest } from '../middlewares/auth.js';
+import { onlineMentorFilter } from '../services/presenceService.js';
 
 export const getStats = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -13,7 +14,7 @@ export const getStats = async (req: AuthRequest, res: Response): Promise<void> =
         { $match: { status: { $ne: 'CLOSED' } } },
         { $group: { _id: '$courseCode', count: { $sum: 1 } } },
       ]),
-      Mentor.countDocuments({ isOnline: true }),
+      Mentor.countDocuments(onlineMentorFilter()),
       KnowledgeItem.countDocuments(),
       Doubt.countDocuments({ 'author.id': req.userId }),
       User.findById(req.userId),

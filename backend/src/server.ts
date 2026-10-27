@@ -5,7 +5,6 @@ import { connectDB } from './config/database.js';
 import { seedDatabase } from './utils/seed.js';
 import { initSocket } from './socket/index.js';
 import { User } from './models/User.js';
-import { Mentor } from './models/Mentor.js';
 
 // Comma-separated ADMIN_EMAILS are promoted to admin at startup (and at signup).
 const bootstrapAdmins = async (): Promise<void> => {
@@ -23,8 +22,6 @@ const start = async () => {
   await connectDB();
   await seedDatabase();
   await bootstrapAdmins();
-  // Presence is tracked from live socket connections, so nobody is online at boot.
-  await Mentor.updateMany({}, { isOnline: false });
 
   const app = createApp();
   const server = http.createServer(app);

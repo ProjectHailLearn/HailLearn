@@ -41,7 +41,6 @@ export const syncMentorProfile = async (user: IUser): Promise<void> => {
       },
       $setOnInsert: {
         year: user.role === 'faculty' ? 'Faculty Mentor' : 'Peer Mentor',
-        isOnline: false,
         bio: `${user.name} mentors students in ${user.department}.`,
       },
     },

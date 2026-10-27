@@ -27,7 +27,8 @@ import {
   addNotification,
 } from '../store/slices/uiSlice';
 import { notificationService, toNotification } from '../services/notificationService';
-import { connectSocket, disconnectSocket } from '../services/socketService';
+import { connectSocket, disconnectSocket, isSocketConnected } from '../services/socketService';
+import { presenceService } from '../services/presenceService';
 import { logout } from '../store/slices/authSlice';
 import { systemService } from '../services/adminService';
 import { SystemStatus } from '../types';
@@ -42,7 +43,13 @@ export const DashboardLayout: React.FC = () => {
   const navigate = useNavigate();
   const isSidebarCollapsed = useAppSelector((state) => state.ui.isSidebarCollapsed);
   const user = useAppSelector((state) => state.auth.user);
-  const handleLogout = () => { disconnectSocket(); dispatch(logout()); navigate('/login'); };
+  const token = useAppSelector((state) => state.auth.token);
+  const handleLogout = () => {
+    if (token) presenceService.goOffline(token).catch(() => {});
+    disconnectSocket();
+    dispatch(logout());
+    navigate('/login');
+  };
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -56,7 +63,6 @@ export const DashboardLayout: React.FC = () => {
   }, []);
 
   // Real-time notifications over Socket.IO, with a slow poll as a fallback.
-  const token = useAppSelector((state) => state.auth.token);
   useEffect(() => {
     if (!token) return;
     const load = () => notificationService.getAll().then((n) => dispatch(setNotifications(n))).catch(() => {});
@@ -64,7 +70,9 @@ export const DashboardLayout: React.FC = () => {
     const socket = connectSocket(token);
     const onNotification = (n: Record<string, unknown>) => dispatch(addNotification(toNotification(n)));
     socket.on('notification', onNotification);
-    const id = window.setInterval(load, 120000);
+    // Without a socket (e.g. on Vercel) poll every 20s; with one, refresh every 2 minutes as a safety net.
+    let ticks = 0;
+    const id = window.setInterval(() => { ticks += 1; if (!isSocketConnected() || ticks % 6 === 0) load(); }, 20000);
     return () => {
       socket.off('notification', onNotification);
       window.clearInterval(id);
@@ -79,7 +87,20 @@ export const DashboardLayout: React.FC = () => {
     load();
     const socket = connectSocket(token);
     socket.on('mentors:presence', load);
-    return () => { socket.off('mentors:presence', load); };
+    const id = window.setInterval(() => { if (!isSocketConnected()) load(); }, 30000);
+    return () => {
+      socket.off('mentors:presence', load);
+      window.clearInterval(id);
+    };
+  }, [token]);
+
+  // Presence heartbeat: keeps this user's mentor profile "online" while the app is open.
+  useEffect(() => {
+    if (!token) return;
+    const beat = () => presenceService.heartbeat().catch(() => {});
+    beat();
+    const id = window.setInterval(beat, 30000);
+    return () => window.clearInterval(id);
   }, [token]);
 
   const unreadNotifCount = useAppSelector(

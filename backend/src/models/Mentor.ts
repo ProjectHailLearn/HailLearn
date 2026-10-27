@@ -9,7 +9,7 @@ export interface IMentor extends Document {
   reviewsCount: number;
   resolvedDoubtsCount: number;
   karmaPoints: number;
-  isOnline: boolean;
+  lastSeenAt?: Date;
   specializations: string[];
   bio: string;
   userId?: string;
@@ -25,7 +25,8 @@ const MentorSchema = new Schema<IMentor>(
     reviewsCount: { type: Number, default: 0 },
     resolvedDoubtsCount: { type: Number, default: 0 },
     karmaPoints: { type: Number, default: 0 },
-    isOnline: { type: Boolean, default: false },
+    // Presence: see services/presenceService.ts
+    lastSeenAt: { type: Date },
     specializations: { type: [String], default: [] },
     bio: { type: String, default: '' },
     userId: { type: String },

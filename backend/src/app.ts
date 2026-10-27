@@ -12,6 +12,8 @@ import roomRoutes from './routes/roomRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import { Mentor } from './models/Mentor.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import presenceRoutes from './routes/presenceRoutes.js';
+import { onlineMentorFilter } from './services/presenceService.js';
 import mongoose from 'mongoose';
 import { connectDB } from './config/database.js';
 import { getStats } from './controllers/statsController.js';
@@ -52,12 +54,23 @@ export const createApp = (): Express => {
     }
   });
 
-  const limiter = rateLimit({
-    windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+  // Writes keep the strict limit. Reads get their own, larger budget: without Socket.IO (e.g. on Vercel)
+  // the client polls chat every 3s plus notifications/presence, about 30 GETs a minute per open tab.
+  const windowMs = Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000;
+  const tooMany = { success: false, message: 'Too many requests, please try again later.' };
+  const writeLimiter = rateLimit({
+    windowMs,
     max: Number(process.env.RATE_LIMIT_MAX_REQUESTS) || 200,
-    message: { success: false, message: 'Too many requests, please try again later.' },
+    skip: (req) => req.method === 'GET',
+    message: tooMany,
   });
-  app.use('/api', limiter);
+  const readLimiter = rateLimit({
+    windowMs,
+    max: Number(process.env.RATE_LIMIT_MAX_READS) || 1500,
+    skip: (req) => req.method !== 'GET',
+    message: tooMany,
+  });
+  app.use('/api', writeLimiter, readLimiter);
 
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -81,10 +94,11 @@ export const createApp = (): Express => {
   app.get('/api/system', protect, async (_req: Request, res: Response) => {
     const provider = (process.env.AI_PROVIDER || '').toLowerCase();
     const aiConfigured = !!process.env.AI_API_KEY && (provider === 'gemini' || provider === 'grok');
-    const onlineMentors = await Mentor.countDocuments({ isOnline: true }).catch(() => 0);
+    const onlineMentors = await Mentor.countDocuments(onlineMentorFilter()).catch(() => 0);
     res.json({ success: true, data: { aiProvider: aiConfigured ? provider : 'fallback', aiConfigured, onlineMentors } });
   });
   app.use('/api/notifications', notificationRoutes);
+  app.use('/api/presence', presenceRoutes);
   app.get('/api/stats', protect, getStats);
 
   app.use((_req: Request, res: Response) => {

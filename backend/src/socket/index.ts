@@ -1,7 +1,7 @@
 import http from 'http';
 import jwt from 'jsonwebtoken';
 import { Server } from 'socket.io';
-import { Mentor } from '../models/Mentor.js';
+import { markSeen, markOffline } from '../services/presenceService.js';
 
 let io: Server | null = null;
 // Open socket count per user, so presence survives multiple tabs.
@@ -14,10 +14,9 @@ const isAllowedOrigin = (origin: string | undefined): boolean =>
   (origin ? /^https:\/\/.*\.vercel\.app$/.test(origin) : false) ||
   origin === (process.env.CLIENT_URL || 'http://localhost:5173');
 
-const setPresence = async (userId: string, isOnline: boolean): Promise<void> => {
+const setPresence = async (userId: string, online: boolean): Promise<void> => {
   try {
-    const mentor = await Mentor.findOneAndUpdate({ userId }, { isOnline }, { new: true });
-    if (mentor) io?.emit('mentors:presence', { mentorId: mentor._id.toString(), isOnline });
+    await (online ? markSeen(userId) : markOffline(userId));
   } catch (err) {
     console.error('[socket] presence update failed:', (err as Error).message);
   }

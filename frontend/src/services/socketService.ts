@@ -29,3 +29,6 @@ export const disconnectSocket = (): void => {
   socket = null;
   socketToken = null;
 };
+
+// False on Vercel (VITE_REALTIME=false) or while the socket is down; callers then poll instead.
+export const isSocketConnected = (): boolean => !!socket?.connected;

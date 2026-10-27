@@ -15,7 +15,7 @@ import { Avatar } from '../components/common/Avatar';
 import { Mentor, MentorRequest } from '../types';
 import { mentorService } from '../services/mentorService';
 import { requestService } from '../services/requestService';
-import { getSocket } from '../services/socketService';
+import { getSocket, isSocketConnected } from '../services/socketService';
 import { ChatPanel } from '../components/mentorship/ChatPanel';
 import { useSearchParams } from 'react-router-dom';
 
@@ -30,7 +30,14 @@ export const MentorshipPage: React.FC = () => {
     const onPresence = ({ mentorId, isOnline }: { mentorId: string; isOnline: boolean }) =>
       setMentors((prev) => prev.map((m) => (m.id === mentorId ? { ...m, isOnline } : m)));
     socket?.on('mentors:presence', onPresence);
-    return () => { socket?.off('mentors:presence', onPresence); };
+    // Without a socket, refresh online status every 30s (matches the presence heartbeat).
+    const id = window.setInterval(() => {
+      if (!isSocketConnected()) mentorService.getAll().then(setMentors).catch(() => {});
+    }, 30000);
+    return () => {
+      socket?.off('mentors:presence', onPresence);
+      window.clearInterval(id);
+    };
   }, []);
 
   const [searchParams] = useSearchParams();
@@ -46,23 +53,29 @@ export const MentorshipPage: React.FC = () => {
   const [requestError, setRequestError] = useState<string | null>(null);
   const [requests, setRequests] = useState<{ sent: MentorRequest[]; received: MentorRequest[] }>({ sent: [], received: [] });
 
-  const loadRequests = () =>
+  const loadRequests = (openDeepLink = false) =>
     requestService.getAll().then((r) => {
       setRequests(r);
+      if (!openDeepLink) return;
       // Deep link from a notification: /mentorship?chat=<requestId>
       const chatId = searchParams.get('chat');
       const match = chatId && [...r.sent, ...r.received].find((x) => x.id === chatId && x.status === 'ACCEPTED');
       if (match) setChatRequest(match);
     }).catch(console.error);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { loadRequests(); }, [searchParams]);
+  useEffect(() => { loadRequests(true); }, [searchParams]);
 
   // Refresh the lists when a request is created/accepted elsewhere.
   useEffect(() => {
     const socket = getSocket();
     const onNotification = (n: { link?: string }) => { if (n.link?.startsWith('/mentorship')) loadRequests(); };
     socket?.on('notification', onNotification);
-    return () => { socket?.off('notification', onNotification); };
+    // Without a socket, pick up new/accepted requests every 15s.
+    const id = window.setInterval(() => { if (!isSocketConnected()) loadRequests(); }, 15000);
+    return () => {
+      socket?.off('notification', onNotification);
+      window.clearInterval(id);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
