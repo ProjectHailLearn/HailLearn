@@ -15,6 +15,12 @@ const validJson = JSON.stringify({
   suggestedReadings: ['Randomized algorithms'],
 });
 
+// Shape of a Gemini Interactions API response: thought steps, then the model output.
+const interaction = (text: string) => ({
+  status: 'completed',
+  steps: [{ type: 'thought', signature: 'x' }, { type: 'model_output', content: [{ type: 'text', text }] }],
+});
+
 const mockFetch = (body: unknown, ok = true) =>
   jest.fn().mockResolvedValue({ ok, status: ok ? 200 : 500, json: async () => body, text: async () => 'err' });
 
@@ -35,15 +41,44 @@ describe('aiService.solveDoubt', () => {
   it('parses a Gemini response', async () => {
     process.env.AI_PROVIDER = 'gemini';
     process.env.AI_API_KEY = 'test-key';
-    const fetchMock = mockFetch({ candidates: [{ content: { parts: [{ text: validJson }] } }] });
+    const fetchMock = mockFetch(interaction(validJson));
     global.fetch = fetchMock as unknown as typeof fetch;
 
     const res = await solveDoubt({ ...input, depth: 'socratic' });
     expect(res.source).toBe('gemini');
     expect(res.aiConfidenceScore).toBe(92);
     expect(res.aiSolution.summary).toBe('Pivot choice matters.');
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.contents[0].parts[0].text).toContain('Do NOT give the final answer');
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain('/v1beta/interactions');
+    expect(init.headers['x-goog-api-key']).toBe('test-key');
+    const body = JSON.parse(init.body);
+    expect(body.model).toBe('gemini-3.5-flash');
+    expect(body.input).toContain('Do NOT give the final answer');
+  });
+
+  it('tries the next Gemini model when one is overloaded', async () => {
+    process.env.AI_PROVIDER = 'gemini';
+    process.env.AI_API_KEY = 'test-key';
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 503, text: async () => 'high demand' })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => interaction(validJson) });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const res = await solveDoubt(input);
+    expect(res.source).toBe('gemini');
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body).model).toBe('gemini-3.5-flash-lite');
+  });
+
+  it('maps a retired model preference to a current model', async () => {
+    process.env.AI_PROVIDER = 'gemini';
+    process.env.AI_API_KEY = 'test-key';
+    const fetchMock = mockFetch(interaction(validJson));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await solveDoubt({ ...input, preferredModel: 'gemini-1.5-flash' });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).model).toBe('gemini-3.5-flash-lite');
   });
 
   it('parses a Grok response wrapped in markdown fences', async () => {

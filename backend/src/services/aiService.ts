@@ -94,21 +94,57 @@ const normalize = (raw: unknown): { solution: AiSolution; confidence: number } |
   };
 };
 
-const callGemini = async (prompt: string, key: string, model: string): Promise<string> => {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: 'application/json' },
-      }),
+// Tried in order when a model is overloaded (503), rate-limited (429) or unavailable to this key (404).
+export const GEMINI_MODELS = ['gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
+
+// Retired models that may still be saved in user preferences.
+const LEGACY_GEMINI_MODELS: Record<string, string> = {
+  'gemini-1.5-pro': 'gemini-3.5-flash',
+  'gemini-1.5-flash': 'gemini-3.5-flash-lite',
+};
+
+class ProviderError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
+
+type InteractionStep = { type?: string; content?: { type?: string; text?: string }[] };
+
+// Gemini Interactions API (generateContent is no longer served for current models).
+const callGeminiModel = async (prompt: string, key: string, model: string): Promise<string> => {
+  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+    body: JSON.stringify({ model, input: prompt, response_format: { type: 'text', mime_type: 'application/json' } }),
+  });
+  if (!res.ok) throw new ProviderError(`Gemini ${model} ${res.status}: ${await res.text()}`, res.status);
+  const data = (await res.json()) as { steps?: InteractionStep[] };
+  return (data.steps ?? [])
+    .filter((s) => s.type === 'model_output')
+    .flatMap((s) => s.content ?? [])
+    .map((c) => c.text ?? '')
+    .join('');
+};
+
+const callGemini = async (prompt: string, key: string, models: string[]): Promise<string> => {
+  let lastError: unknown;
+  for (const model of models) {
+    try {
+      return await callGeminiModel(prompt, key, model);
+    } catch (err) {
+      lastError = err;
+      if (!(err instanceof ProviderError) || ![404, 429, 503].includes(err.status)) throw err;
+      console.warn(`[aiService] ${model} unavailable (${err.status}), trying next model`);
     }
-  );
-  if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
-  const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  }
+  throw lastError;
+};
+
+const geminiModels = (preferred: string | undefined): string[] => {
+  const pref = preferred ? LEGACY_GEMINI_MODELS[preferred] ?? preferred : undefined;
+  const first = process.env.AI_MODEL || (pref?.startsWith('gemini') ? pref : undefined);
+  return first ? [first, ...GEMINI_MODELS.filter((m) => m !== first)] : GEMINI_MODELS;
 };
 
 const callGrok = async (prompt: string, key: string, model: string): Promise<string> => {
@@ -135,7 +171,7 @@ export const solveDoubt = async (input: SolveInput): Promise<SolveResult> => {
     const prompt = buildPrompt(input);
     const text =
       provider === 'gemini'
-        ? await callGemini(prompt, key, pickModel(provider, input.preferredModel, 'gemini-1.5-flash'))
+        ? await callGemini(prompt, key, geminiModels(input.preferredModel))
         : await callGrok(prompt, key, pickModel(provider, input.preferredModel, 'grok-2-latest'));
     const parsed = normalize(extractJson(text));
     if (!parsed) return fallbackSolution(input);

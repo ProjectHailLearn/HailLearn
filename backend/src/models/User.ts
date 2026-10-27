@@ -33,7 +33,7 @@ const UserSchema = new Schema<IUser>(
     specializations: { type: [String], default: [] },
     rating: { type: Number, min: 0, max: 5 },
     preferences: {
-      aiModel: { type: String, default: 'gemini-1.5-flash' },
+      aiModel: { type: String, default: 'gemini-3.5-flash' },
       emailNotifications: { type: Boolean, default: true },
     },
     passwordResetHash: { type: String, select: false },

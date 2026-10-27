@@ -97,7 +97,7 @@ Doubts are answered by Gemini or Grok. Without a key, a structured template answ
 # backend/.env
 AI_PROVIDER=gemini        # or grok
 AI_API_KEY=your_key
-AI_MODEL=                 # optional override (defaults: gemini-1.5-flash / grok-2-latest)
+AI_MODEL=                 # optional override (Gemini default: gemini-3.5-flash, falling back to lite models when busy; Grok: grok-2-latest)
 ```
 
 ### 4. Admin & Email (optional)

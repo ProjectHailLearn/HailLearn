@@ -13,10 +13,16 @@ import { updateProfile } from '../store/slices/authSlice';
 import { authService } from '../services/authService';
 import { apiError } from '../utils/errors';
 
+// Retired Gemini models that may still be saved in a user's preferences.
+const LEGACY_MODELS: Record<string, string> = {
+  'gemini-1.5-pro': 'gemini-3.5-flash',
+  'gemini-1.5-flash': 'gemini-3.5-flash-lite',
+};
+
 export const SettingsPage: React.FC = () => {
   const user = useAppSelector((state) => state.auth.user);
   const dispatch = useAppDispatch();
-  const [model, setModel] = useState(user?.preferences?.aiModel || 'gemini-1.5-flash');
+  const [model, setModel] = useState(LEGACY_MODELS[user?.preferences?.aiModel ?? ''] ?? user?.preferences?.aiModel ?? 'gemini-3.5-flash');
   const [form, setForm] = useState({
     name: user?.name || '',
     university: user?.university || '',
@@ -84,7 +90,7 @@ export const SettingsPage: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <label
               className={`p-4 rounded-xl border cursor-pointer transition ${
-                model === 'gemini-1.5-pro'
+                model === 'gemini-3.5-flash'
                   ? 'bg-brand-950/40 border-brand-500/60 shadow-lg shadow-brand-500/10'
                   : 'bg-slate-950/60 border-slate-800'
               }`}
@@ -93,8 +99,8 @@ export const SettingsPage: React.FC = () => {
                 <input
                   type="radio"
                   name="model"
-                  value="gemini-1.5-pro"
-                  checked={model === 'gemini-1.5-pro'}
+                  value="gemini-3.5-flash"
+                  checked={model === 'gemini-3.5-flash'}
                   onChange={(e) => setModel(e.target.value)}
                   className="text-brand-600 focus:ring-brand-500 mt-1"
                 />
@@ -102,15 +108,15 @@ export const SettingsPage: React.FC = () => {
                   Recommended
                 </span>
               </div>
-              <div className="mt-2 text-sm font-bold text-white">Gemini 1.5 Pro (Deep Reasoning)</div>
+              <div className="mt-2 text-sm font-bold text-white">Gemini 3.5 Flash (Deep Reasoning)</div>
               <p className="text-xs text-slate-400 mt-1">
-                2M token context window, optimal for exhaustive proof generation and mathematical derivations.
+                Thinks through problems step by step; best for proofs, derivations and tricky code.
               </p>
             </label>
 
             <label
               className={`p-4 rounded-xl border cursor-pointer transition ${
-                model === 'gemini-1.5-flash'
+                model === 'gemini-3.5-flash-lite'
                   ? 'bg-brand-950/40 border-brand-500/60 shadow-lg shadow-brand-500/10'
                   : 'bg-slate-950/60 border-slate-800'
               }`}
@@ -119,8 +125,8 @@ export const SettingsPage: React.FC = () => {
                 <input
                   type="radio"
                   name="model"
-                  value="gemini-1.5-flash"
-                  checked={model === 'gemini-1.5-flash'}
+                  value="gemini-3.5-flash-lite"
+                  checked={model === 'gemini-3.5-flash-lite'}
                   onChange={(e) => setModel(e.target.value)}
                   className="text-brand-600 focus:ring-brand-500 mt-1"
                 />
@@ -128,7 +134,7 @@ export const SettingsPage: React.FC = () => {
                   Ultra Fast
                 </span>
               </div>
-              <div className="mt-2 text-sm font-bold text-white">Gemini 1.5 Flash (Sub-Second)</div>
+              <div className="mt-2 text-sm font-bold text-white">Gemini 3.5 Flash-Lite (Fast)</div>
               <p className="text-xs text-slate-400 mt-1">
                 Optimized for low-latency live study rooms and instant chat hint generation.
               </p>
