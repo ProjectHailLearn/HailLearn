@@ -119,7 +119,9 @@ cd frontend && npm run lint && npm run build
 ## ✨ Features
 - **AI Doubt Studio**: ask a question with optional code; AI returns step-by-step reasoning (detailed, concise, or Socratic hints).
 - **Doubt lifecycle**: `AI_RESOLVED → MENTOR_ESCALATED → FACULTY_VERIFIED → CLOSED`, with mentor/faculty answers and role-based permissions.
-- **Knowledge Vault**: faculty-verified doubts are published automatically; search, filter by category, upvote, view counts.
+- **Knowledge Vault**: faculty-verified doubts are published automatically; ranked search, filter by category, full-article reader, upvote, view counts.
+- **RAG**: every new doubt retrieves the most relevant vault entries (BM25 ranking) and gives them to the AI as context; answers cite them as [K1], [K2] and list the sources used.
+- **Confidence score**: the AI rates itself against a rubric (90–100 certain … below 50 unsure). If it cited vault sources, the shown score is 75% self-rating + 25% source match; otherwise the self-rating is capped at 90.
 - **Mentorship**: browse mentors with live online status, send 1-on-1 requests, mentors accept/decline, then chat in real time.
 - **Courses**: enroll, open-doubt counts per course, personal progress.
 - **Study Rooms**: host or join scheduled/live peer sessions with optional meeting links.

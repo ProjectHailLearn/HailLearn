@@ -24,6 +24,7 @@ import { mentorService } from '../services/mentorService';
 import { courseService } from '../services/courseService';
 import { Mentor, Course, DoubtStatus } from '../types';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { RagSources } from '../components/doubts/RagSources';
 
 const errorMessage = (err: unknown, fallback: string): string =>
   (err as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback;
@@ -436,6 +437,8 @@ export const DoubtWorkspacePage: React.FC = () => {
                       {activeDoubt.aiSolution.citations.map((cite, idx) => <li key={idx}>{cite}</li>)}
                     </ul>
                   </div>
+
+                  <RagSources sources={activeDoubt.retrievedSources} confidence={activeDoubt.confidenceBreakdown} />
 
                   {activeDoubt.assignedMentor ? (
                     <div className="p-4 rounded-xl bg-purple-950/30 border border-purple-500/30 flex items-center justify-between">

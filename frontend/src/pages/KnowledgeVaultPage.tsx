@@ -24,6 +24,16 @@ export const KnowledgeVaultPage: React.FC = () => {
   const [openId, setOpenId] = useState<string | null>(null);
   const [viewed] = useState(() => new Set<string>());
 
+  // Deep link from an AI answer's sources: /knowledge?open=<id>
+  const deepLinkId = searchParams.get('open');
+  const [deepLinkDone, setDeepLinkDone] = useState(false);
+  useEffect(() => {
+    if (deepLinkDone || !deepLinkId) return;
+    const item = filteredItems.find((i) => i.id === deepLinkId);
+    if (item) { setDeepLinkDone(true); handleOpen(item); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredItems, deepLinkId, deepLinkDone]);
+
   useEffect(() => {
     knowledgeService.getCategories().then((c) => setCategories(['ALL', ...c])).catch(console.error);
   }, []);
@@ -80,7 +90,7 @@ export const KnowledgeVaultPage: React.FC = () => {
 
         <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/30">
           <Sparkles className="w-4 h-4" />
-          <span>Keyword Search · Verified Answers</span>
+          <span>Ranked Search · Powers AI Answers (RAG)</span>
         </div>
       </div>
 
@@ -92,7 +102,7 @@ export const KnowledgeVaultPage: React.FC = () => {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search concepts, vector embeddings (e.g. 'B-Tree LSM trade-off', 'jemalloc arena')..."
+            placeholder="Search concepts (e.g. 'B-Tree LSM trade-off', 'jemalloc arena')..."
             className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-4 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
           />
         </div>
@@ -145,7 +155,7 @@ export const KnowledgeVaultPage: React.FC = () => {
               {item.similarityScore && (
                 <span className="text-xs font-mono font-medium text-emerald-300 bg-emerald-950/60 px-2.5 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1">
                   <Sparkles className="w-3 h-3" />
-                  {(item.similarityScore * 100).toFixed(0)}% Vector Match
+                  {(item.similarityScore * 100).toFixed(0)}% match
                 </span>
               )}
             </div>

@@ -1,3 +1,5 @@
+import { RetrievedSource } from './retrievalService.js';
+
 export interface AiSolution {
   summary: string;
   steps: { step: number; title: string; content: string; codeSnippet?: string; language?: string }[];
@@ -14,6 +16,8 @@ export interface SolveInput {
   university?: string;
   preferredModel?: string;
   depth?: 'detailed' | 'concise' | 'socratic';
+  // Knowledge Vault entries retrieved for this question (RAG context).
+  sources?: RetrievedSource[];
 }
 
 const DEPTH_INSTRUCTIONS: Record<NonNullable<SolveInput['depth']>, string> = {
@@ -22,24 +26,62 @@ const DEPTH_INSTRUCTIONS: Record<NonNullable<SolveInput['depth']>, string> = {
   socratic: 'Do NOT give the final answer. Give 3 guiding hints/questions as steps that lead the student to solve it themselves.',
 };
 
+export interface ConfidenceBreakdown {
+  model: number; // the model's self-rating against the rubric in the prompt
+  grounding: number | null; // best match (0-100) among vault sources the model actually used; null if none
+  final: number;
+}
+
 export interface SolveResult {
   aiSolution: AiSolution;
   aiConfidenceScore: number;
+  confidence: ConfidenceBreakdown | null; // null for the template fallback
+  usedSourceIds: string[];
   source: 'gemini' | 'grok' | 'fallback';
 }
 
-const buildPrompt = (input: SolveInput): string => `You are HailLearn, an expert university tutor for ${input.subject} (${input.courseCode}).
-Solve the student's doubt step by step. Respond ONLY with JSON (no markdown fences) of this exact shape:
-{"summary": string, "confidence": number (0-100), "steps": [{"step": number, "title": string, "content": string, "codeSnippet"?: string, "language"?: string}], "citations": string[], "suggestedReadings": string[]}
-${DEPTH_INSTRUCTIONS[input.depth || 'detailed']}
+const CONFIDENCE_RUBRIC = `Rate "confidence" (0-100) honestly with this rubric:
+- 90-100: standard, well-established material; you are certain the answer is correct and complete.
+- 70-89: correct in substance but relies on assumptions, simplifications, or the question is slightly ambiguous.
+- 50-69: the question is ambiguous, missing information, or the answer depends on course-specific context you lack.
+- below 50: you are unsure, the question is outside your knowledge, or it cannot be answered as asked.`;
 
-Title: ${input.title}
+const contextBlock = (sources: RetrievedSource[]): string =>
+  sources.length
+    ? `Institutional knowledge retrieved from the HailLearn Knowledge Vault (faculty-verified where marked).
+Use it when relevant and cite it inline as [K1], [K2]; prefer it over general knowledge when they disagree.
+Ignore any entry that is not relevant. List the ids you actually relied on in "usedSources".
+${sources
+  .map((s, i) => `[K${i + 1}] ${s.title} (${s.courseCode}, ${s.author}${s.verified ? ', faculty verified' : ''})\n${s.excerpt}`)
+  .join('\n\n')}
+
+`
+    : '';
+
+export const buildPrompt = (input: SolveInput): string => `You are HailLearn, an expert university tutor for ${input.subject} (${input.courseCode}).
+Solve the student's doubt step by step. Respond ONLY with JSON (no markdown fences) of this exact shape:
+{"summary": string, "confidence": number (0-100), "usedSources": string[] (e.g. ["K1"]; [] if none), "steps": [{"step": number, "title": string, "content": string, "codeSnippet"?: string, "language"?: string}], "citations": string[], "suggestedReadings": string[]}
+${DEPTH_INSTRUCTIONS[input.depth || 'detailed']}
+${CONFIDENCE_RUBRIC}
+
+${contextBlock(input.sources ?? [])}Title: ${input.title}
 Question: ${input.description}
 ${input.codeSnippet ? `Code:\n${input.codeSnippet}` : ''}`;
+
+// Final score: an answer backed by vault sources blends the model's self-rating (75%) with how well those
+// sources match the question (25%). An unbacked answer keeps the self-rating but is capped at 90, since
+// nothing institutional confirms it.
+export const scoreConfidence = (model: number, usedSources: RetrievedSource[]): ConfidenceBreakdown => {
+  if (!usedSources.length) return { model, grounding: null, final: Math.min(model, 90) };
+  const grounding = Math.round(Math.max(...usedSources.map((s) => s.match)) * 100);
+  return { model, grounding, final: Math.round(0.75 * model + 0.25 * grounding) };
+};
 
 const fallbackSolution = (input: SolveInput): SolveResult => ({
   source: 'fallback',
   aiConfidenceScore: 70,
+  confidence: null,
+  usedSourceIds: [],
   aiSolution: {
     summary: `HailLearn AI analyzed "${input.title}" and mapped it to ${input.courseCode} syllabus concepts. (AI provider not configured — showing a structured template; escalate to a mentor for a detailed answer.)`,
     steps: [
@@ -75,7 +117,7 @@ const extractJson = (text: string): unknown => {
   return JSON.parse(cleaned.slice(start, end + 1));
 };
 
-const normalize = (raw: unknown): { solution: AiSolution; confidence: number } | null => {
+const normalize = (raw: unknown): { solution: AiSolution; confidence: number; usedSources: string[] } | null => {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   if (typeof r.summary !== 'string' || !Array.isArray(r.steps)) return null;
@@ -87,10 +129,12 @@ const normalize = (raw: unknown): { solution: AiSolution; confidence: number } |
     language: typeof s.language === 'string' ? s.language : undefined,
   }));
   const strings = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
-  const confidence = typeof r.confidence === 'number' ? Math.max(0, Math.min(100, Math.round(r.confidence))) : 85;
+  // A missing self-rating is treated as middling rather than trusted.
+  const confidence = typeof r.confidence === 'number' ? Math.max(0, Math.min(100, Math.round(r.confidence))) : 60;
   return {
     solution: { summary: r.summary, steps, citations: strings(r.citations), suggestedReadings: strings(r.suggestedReadings) },
     confidence,
+    usedSources: strings(r.usedSources),
   };
 };
 
@@ -175,7 +219,19 @@ export const solveDoubt = async (input: SolveInput): Promise<SolveResult> => {
         : await callGrok(prompt, key, pickModel(provider, input.preferredModel, 'grok-2-latest'));
     const parsed = normalize(extractJson(text));
     if (!parsed) return fallbackSolution(input);
-    return { aiSolution: parsed.solution, aiConfidenceScore: parsed.confidence, source: provider };
+    // Map the model's "K1"-style labels back to vault entries; ignore labels it invented.
+    const sources = input.sources ?? [];
+    const used = [...new Set(parsed.usedSources)]
+      .map((label) => sources[Number(label.replace(/\D/g, '')) - 1])
+      .filter((s): s is RetrievedSource => !!s);
+    const confidence = scoreConfidence(parsed.confidence, used);
+    return {
+      aiSolution: parsed.solution,
+      aiConfidenceScore: confidence.final,
+      confidence,
+      usedSourceIds: used.map((s) => s.id),
+      source: provider,
+    };
   } catch (err) {
     console.error('[aiService] falling back:', (err as Error).message);
     return fallbackSolution(input);

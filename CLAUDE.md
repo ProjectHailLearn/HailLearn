@@ -66,7 +66,10 @@ Mongoose models (also `Course`, `StudyRoom`, `MentorRequest`, `Notification`):
 - **User** — roles: `student | mentor | faculty | admin`; stores karma, specializations, department
 - **Doubt** — lifecycle: `ANALYZING → AI_RESOLVED | MENTOR_ESCALATED → FACULTY_VERIFIED → CLOSED`; embeds `aiSolution` (steps + citations) and `assignedMentor`
 - **Mentor** — separate from User; seeded mentors have no `userId`. Mentor/faculty users get a linked Mentor doc (`userId`) on register/profile update
-- **KnowledgeItem** — verified community answers; tracks upvotes, views, similarityScore (for future RAG)
+- **KnowledgeItem** — verified community answers (`content` = full article, `doubtId` = source doubt); tracks upvotes, views
+
+### RAG & confidence
+`services/retrievalService.ts` ranks Knowledge Vault entries with in-process BM25 (no embedding API; the configured Gemini key can't call embedding models). `createDoubt` retrieves up to 3 entries covering ≥30% of the question's terms, `aiService.buildPrompt` passes them as `[K1]…` context, and the model returns `usedSources`. `scoreConfidence`: with cited sources, final = 0.75 × model self-rating + 0.25 × best cited match; otherwise the self-rating capped at 90. Doubts store `retrievedSources` and `confidenceBreakdown`; vault search uses the same ranking.
 
 ### API Surface
 See the API Reference table in `README.md`. Tests (`backend/src/tests/`, Jest + supertest) cover only paths that don't need MongoDB.

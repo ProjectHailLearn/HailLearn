@@ -8,6 +8,7 @@ import { doubtService } from '../../services/doubtService';
 import { courseService } from '../../services/courseService';
 import { Course, Doubt } from '../../types';
 import { useNavigate } from 'react-router-dom';
+import { RagSources } from '../doubts/RagSources';
 
 export const QuickAskCard: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -126,6 +127,8 @@ export const QuickAskCard: React.FC = () => {
                   </ul>
                 </div>
               )}
+
+              <RagSources sources={answer.retrievedSources} confidence={answer.confidenceBreakdown} />
             </>
           ) : (
             <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400">

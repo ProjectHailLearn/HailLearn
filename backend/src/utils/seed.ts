@@ -99,7 +99,6 @@ When to choose which
 
 Key takeaway
 Neither design wins everywhere: B-Trees optimise reads and predictable latency, LSM-Trees optimise sustained write throughput at the cost of background compaction work.`,
-    similarityScore: 0.96,
   },
   {
     title: 'Memory Allocators Deep Dive: jemalloc vs tcmalloc Arena Architecture',
@@ -137,7 +136,6 @@ Trade-offs
 
 Key takeaway
 Lock contention is avoided by making the common path thread-local and only touching shared structures in batches.`,
-    similarityScore: 0.91,
   },
   {
     title: 'Vector Embeddings & Cosine vs Dot-Product Distance in High Dimensions',
@@ -174,7 +172,6 @@ ANN indexes such as HNSW or IVF support cosine, dot product and L2. A common tri
 
 Key takeaway
 Use the similarity your embedding model was trained with; for most text models that is cosine (equivalently, dot product on normalised vectors).`,
-    similarityScore: 0.98,
   },
   {
     title: 'Master Theorem Cases and Polynomial Log-Factor Extensions',
@@ -213,7 +210,6 @@ When it does not apply
 
 Key takeaway
 Compute n^(log_b a), compare it with f(n), and pick the case — the log-factor extension of case 2 covers most divide-and-conquer algorithms you will meet.`,
-    similarityScore: 0.89,
   },
 ];
 

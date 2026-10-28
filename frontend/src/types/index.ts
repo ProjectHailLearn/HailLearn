@@ -30,6 +30,22 @@ export interface AIReasoningStep {
   language?: string;
 }
 
+// How the shown confidence was computed (see backend aiService.scoreConfidence).
+export interface ConfidenceBreakdown {
+  model: number;
+  grounding: number | null;
+  final: number;
+}
+
+// Knowledge Vault entry retrieved for a doubt (RAG). Order matches the [K1], [K2] labels in the answer.
+export interface RetrievedSource {
+  id: string;
+  title: string;
+  courseCode: string;
+  match: number;
+  used: boolean;
+}
+
 export interface Doubt {
   id: string;
   title: string;
@@ -46,6 +62,8 @@ export interface Doubt {
     department: string;
   };
   aiConfidenceScore?: number;
+  confidenceBreakdown?: ConfidenceBreakdown;
+  retrievedSources?: RetrievedSource[];
   aiSolution?: {
     summary: string;
     steps: AIReasoningStep[];

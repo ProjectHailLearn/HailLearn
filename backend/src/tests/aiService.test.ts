@@ -46,7 +46,9 @@ describe('aiService.solveDoubt', () => {
 
     const res = await solveDoubt({ ...input, depth: 'socratic' });
     expect(res.source).toBe('gemini');
-    expect(res.aiConfidenceScore).toBe(92);
+    // No vault sources were used, so the self-rating of 92 is capped at 90.
+    expect(res.aiConfidenceScore).toBe(90);
+    expect(res.confidence).toEqual({ model: 92, grounding: null, final: 90 });
     expect(res.aiSolution.summary).toBe('Pivot choice matters.');
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toContain('/v1beta/interactions');

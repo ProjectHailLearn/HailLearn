@@ -15,6 +15,9 @@ export interface IDoubt extends Document {
     department: string;
   };
   aiConfidenceScore?: number;
+  confidenceBreakdown?: { model: number; grounding: number | null; final: number };
+  // Knowledge Vault entries retrieved for the AI (RAG); used = the model cited it.
+  retrievedSources?: { id: string; title: string; courseCode: string; match: number; used: boolean }[];
   aiSolution?: {
     summary: string;
     steps: { step: number; title: string; content: string; codeSnippet?: string; language?: string }[];
@@ -54,6 +57,11 @@ const DoubtSchema = new Schema<IDoubt>(
       department: { type: String, default: '' },
     },
     aiConfidenceScore: { type: Number },
+    confidenceBreakdown: { type: Schema.Types.Mixed },
+    retrievedSources: {
+      type: [{ _id: false, id: String, title: String, courseCode: String, match: Number, used: Boolean }],
+      default: undefined,
+    },
     aiSolution: { type: Schema.Types.Mixed },
     assignedMentor: { type: Schema.Types.Mixed },
     answers: {

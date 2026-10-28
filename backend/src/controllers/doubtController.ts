@@ -5,6 +5,7 @@ import { Mentor } from '../models/Mentor.js';
 import { KnowledgeItem } from '../models/KnowledgeItem.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { solveDoubt } from '../services/aiService.js';
+import { retrieveForQuestion } from '../services/retrievalService.js';
 import { notify } from '../services/notificationService.js';
 import { knowledgeContentFromDoubt } from '../utils/knowledge.js';
 
@@ -49,10 +50,16 @@ export const createDoubt = async (req: AuthRequest, res: Response): Promise<void
     const user = await User.findById(req.userId);
     if (!user) { res.status(404).json({ success: false, message: 'User not found' }); return; }
 
-    const { aiSolution, aiConfidenceScore, source } = await solveDoubt({
+    // RAG: pull the most relevant Knowledge Vault entries and hand them to the model as context.
+    const sources = await retrieveForQuestion(`${title}\n${description}`, courseCode).catch((err) => {
+      console.error('[rag] retrieval failed:', (err as Error).message);
+      return [];
+    });
+    const { aiSolution, aiConfidenceScore, confidence, usedSourceIds, source } = await solveDoubt({
       title, description, codeSnippet, subject, courseCode, university: user.university,
       preferredModel: user.preferences?.aiModel,
       depth,
+      sources,
     });
 
     const doubt = await Doubt.create({
@@ -66,6 +73,10 @@ export const createDoubt = async (req: AuthRequest, res: Response): Promise<void
       author: { id: user._id.toString(), name: user.name, avatar: user.avatar, department: user.department },
       aiSolution,
       aiConfidenceScore,
+      confidenceBreakdown: confidence ?? undefined,
+      retrievedSources: sources.map((s) => ({
+        id: s.id, title: s.title, courseCode: s.courseCode, match: s.match, used: usedSourceIds.includes(s.id),
+      })),
       upvotes: 0,
       views: 1,
     });
