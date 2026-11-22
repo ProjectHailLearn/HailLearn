@@ -5,6 +5,7 @@ import { getSocket, isSocketConnected } from '../../services/socketService';
 import { ChatMessage, MentorRequest } from '../../types';
 import { useAppSelector } from '../../store';
 import { apiError } from '../../utils/errors';
+import { ReportButton } from '../common/ReportButton';
 
 export const ChatPanel: React.FC<{ request: MentorRequest; onClose: () => void }> = ({ request, onClose }) => {
   const me = useAppSelector((s) => s.auth.user);
@@ -83,8 +84,9 @@ export const ChatPanel: React.FC<{ request: MentorRequest; onClose: () => void }
                   mine ? 'bg-brand-600 text-white rounded-br-sm' : 'bg-slate-800 text-slate-100 rounded-bl-sm'
                 }`}>
                   {m.content}
-                  <div className={`text-[9px] mt-1 ${mine ? 'text-brand-200' : 'text-slate-400'}`}>
+                  <div className={`text-[9px] mt-1 flex items-center gap-2 ${mine ? 'text-brand-200' : 'text-slate-400'}`}>
                     {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {!mine && <ReportButton targetType="message" targetId={m.id} />}
                   </div>
                 </div>
               </div>

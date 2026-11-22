@@ -16,7 +16,7 @@ export const RagSources: React.FC<{ sources?: RetrievedSource[]; confidence?: Co
           <li key={s.id} className="flex items-center gap-2">
             <span className="font-mono text-[10px] font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-1.5 rounded">K{i + 1}</span>
             <Link to={`/knowledge?open=${s.id}`} className="text-slate-200 hover:text-emerald-300 truncate">{s.title}</Link>
-            <span className="text-slate-500 flex-shrink-0">{s.courseCode} · {Math.round(s.match * 100)}% match</span>
+            <span className="text-slate-500 flex-shrink-0">{s.courseCode}{s.author ? ` · by ${s.author}` : ''} · {Math.round(s.match * 100)}% match</span>
             <span className={`ml-auto flex-shrink-0 text-[10px] font-semibold ${s.used ? 'text-emerald-400' : 'text-slate-500'}`}>
               {s.used ? 'cited' : 'not used'}
             </span>

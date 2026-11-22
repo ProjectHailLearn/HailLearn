@@ -1,8 +1,8 @@
 import api from './api';
-import { Doubt } from '../types';
+import { Doubt, Difficulty, DoubtRating } from '../types';
 
 export const doubtService = {
-  getAll: async (params?: { status?: string; mine?: boolean; courseCode?: string; search?: string }): Promise<Doubt[]> => {
+  getAll: async (params?: { status?: string; mine?: boolean; courseCode?: string; search?: string; difficulty?: string }): Promise<Doubt[]> => {
     const res = await api.get('/doubts', { params });
     return res.data.data.map(toDoubt);
   },
@@ -13,7 +13,7 @@ export const doubtService = {
   create: async (payload: {
     title: string; description: string; codeSnippet?: string;
     subject: string; courseCode: string; tags?: string[];
-    depth?: 'detailed' | 'concise' | 'socratic';
+    depth?: 'detailed' | 'concise' | 'socratic'; difficulty?: Difficulty;
   }): Promise<Doubt> => {
     const res = await api.post('/doubts', payload);
     return toDoubt(res.data.data);
@@ -32,6 +32,24 @@ export const doubtService = {
   },
   verify: async (id: string): Promise<Doubt> => {
     const res = await api.put(`/doubts/${id}/verify`);
+    return toDoubt(res.data.data);
+  },
+  // Re-run retrieval + AI + confidence gate (e.g. after the Knowledge Vault has grown).
+  resolveAi: async (id: string): Promise<Doubt> => {
+    const res = await api.post(`/doubts/${id}/resolve-ai`);
+    return toDoubt(res.data.data);
+  },
+  accept: async (id: string): Promise<Doubt> => {
+    const res = await api.post(`/doubts/${id}/accept`);
+    return toDoubt(res.data.data);
+  },
+  decline: async (id: string): Promise<Doubt> => {
+    const res = await api.post(`/doubts/${id}/decline`);
+    return toDoubt(res.data.data);
+  },
+  // Student confirms the doubt is resolved and rates it (closes the doubt).
+  confirm: async (id: string, rating: Omit<DoubtRating, 'target'>): Promise<Doubt> => {
+    const res = await api.post(`/doubts/${id}/confirm`, rating);
     return toDoubt(res.data.data);
   },
   close: async (id: string): Promise<Doubt> => {
@@ -58,6 +76,10 @@ function toDoubt(d: Record<string, unknown>): Doubt {
     aiSolution: d.aiSolution as Doubt['aiSolution'] | undefined,
     assignedMentor: d.assignedMentor as Doubt['assignedMentor'] | undefined,
     answers: (d.answers as Doubt['answers']) || [],
+    difficulty: (d.difficulty as Difficulty | undefined) ?? 'Medium',
+    acceptedBy: d.acceptedBy as Doubt['acceptedBy'] | undefined,
+    acceptedAt: d.acceptedAt as string | undefined,
+    rating: d.rating as DoubtRating | undefined,
     createdAt: d.createdAt
       ? new Date(d.createdAt as string).toLocaleDateString()
       : 'Just now',

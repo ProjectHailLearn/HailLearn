@@ -8,6 +8,7 @@ import {
   MessageSquare,
   Video,
   Award,
+  ShieldCheck,
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
@@ -290,12 +291,18 @@ export const MentorshipPage: React.FC = () => {
                     isOnline={mentor.isOnline}
                   />
                   <div>
-                    <h3 className="text-sm font-bold text-white group-hover:text-purple-300 transition">
+                    <h3 className="text-sm font-bold text-white group-hover:text-purple-300 transition flex items-center gap-1.5">
                       {mentor.name}
+                      {mentor.verifiedBadge && (
+                        <span title="Verified by an administrator" className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-sky-300 bg-sky-500/10 border border-sky-500/30 px-1.5 rounded-full">
+                          <ShieldCheck className="w-3 h-3" /> Verified
+                        </span>
+                      )}
                     </h3>
                     <div className="text-xs text-slate-400">{mentor.department}</div>
                     <div className="text-[11px] text-purple-400 font-medium">
                       {mentor.year}
+                      {mentor.availableNow && !mentor.isOnline && <span className="ml-1.5 text-emerald-400">· available now</span>}
                     </div>
                   </div>
                 </div>
@@ -303,11 +310,14 @@ export const MentorshipPage: React.FC = () => {
                 <div className="text-right space-y-1">
                   <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs font-bold text-amber-400">
                     <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                    {mentor.rating}
+                    {mentor.hasAccount ? mentor.reputationScore.toFixed(2) : mentor.rating}
                   </div>
-                  <div className="text-[10px] text-slate-500">
-                    {mentor.reviewsCount} reviews
+                  <div className="text-[10px] text-slate-500" title={mentor.hasAccount ? 'Reputation from student ratings (starts at 4.00)' : undefined}>
+                    {mentor.hasAccount ? `${mentor.ratingsCount} rating${mentor.ratingsCount === 1 ? '' : 's'}` : `${mentor.reviewsCount} reviews`}
                   </div>
+                  {mentor.hasAccount && mentor.avgResponseMinutes !== undefined && (
+                    <div className="text-[10px] text-slate-500">~{mentor.avgResponseMinutes < 60 ? `${mentor.avgResponseMinutes} min` : `${Math.round(mentor.avgResponseMinutes / 60)} h`} response</div>
+                  )}
                 </div>
               </div>
 

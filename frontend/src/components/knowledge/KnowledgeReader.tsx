@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { X, CheckCircle2, FileText, ThumbsUp, Eye, ArrowUpRight } from 'lucide-react';
 import { KnowledgeItem } from '../../types';
 import { Button } from '../common/Button';
+import { ReportButton } from '../common/ReportButton';
 
 interface KnowledgeReaderProps {
   item: KnowledgeItem;
@@ -106,6 +107,7 @@ export const KnowledgeReader: React.FC<KnowledgeReaderProps> = ({ item, onClose,
               <Eye className="w-3.5 h-3.5" />
               {item.views}
             </span>
+            <ReportButton targetType="knowledge" targetId={item.id} />
           </div>
           {item.doubtId && (
             <Button

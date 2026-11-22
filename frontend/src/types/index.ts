@@ -46,6 +46,24 @@ export interface RetrievedSource {
   courseCode: string;
   match: number;
   used: boolean;
+  author?: string; // who wrote/solved the cited entry (attribution)
+  doubtId?: string;
+}
+
+export type Difficulty = 'Easy' | 'Medium' | 'Hard';
+
+export interface DoubtRating {
+  target: 'mentor' | 'ai';
+  clarity: number;
+  helpfulness: number;
+  responseTime: number;
+  comment?: string;
+}
+
+export interface Availability {
+  acceptingDoubts: boolean;
+  timezone: string;
+  slots: { day: number; start: string; end: string }[];
 }
 
 // Confidence-gate outcome for a doubt (see backend services/routingService.ts).
@@ -53,7 +71,7 @@ export interface RoutingDecision {
   mode: 'grounded_answer' | 'mentor_routing';
   reason: 'confident' | 'low_confidence' | 'ai_unavailable';
   threshold: number;
-  candidates: { mentorId: string; name: string; online: boolean; relevance: number; reputation: number; score: number }[];
+  candidates: { mentorId: string; userId?: string; name: string; online: boolean; available?: boolean; relevance: number; reputation: number; score: number }[];
 }
 
 export interface Doubt {
@@ -88,12 +106,17 @@ export interface Doubt {
     karma: number;
   };
   answers?: DoubtAnswer[];
+  difficulty?: Difficulty;
+  acceptedBy?: { userId: string; mentorId: string; name: string };
+  acceptedAt?: string;
+  rating?: DoubtRating;
   createdAt: string;
   upvotes: number;
   views: number;
 }
 
 export interface DoubtAnswer {
+  _id?: string;
   authorId: string;
   authorName: string;
   authorAvatar: string;
@@ -159,6 +182,13 @@ export interface Mentor {
   specializations: string[];
   bio: string;
   hasAccount: boolean;
+  userId?: string;
+  reputationScore: number;
+  ratingsCount: number;
+  avgResponseMinutes?: number;
+  verifiedBadge: boolean;
+  availableNow: boolean;
+  availability?: Availability;
 }
 
 export interface ChatMessage {
@@ -178,6 +208,9 @@ export interface AdminUser {
   department: string;
   karmaPoints: number;
   avatar: string;
+  suspended: boolean;
+  suspendedReason?: string;
+  emailVerified: boolean;
 }
 
 export interface AdminMentorProfile {
@@ -186,6 +219,49 @@ export interface AdminMentorProfile {
   department: string;
   userId: string | null;
   linkedEmail: string | null;
+  verifiedBadge: boolean;
+  reputationScore: number;
+  ratingsCount: number;
+}
+
+export interface ContentFlag {
+  _id: string;
+  targetType: 'doubt' | 'answer' | 'message' | 'knowledge';
+  targetId: string;
+  parentId?: string;
+  reason: string;
+  preview: string;
+  automatic: boolean;
+  status: 'open' | 'dismissed' | 'removed';
+  createdAt: string;
+}
+
+export interface Conversation {
+  id: string;
+  studentName: string;
+  mentorName: string;
+  topic?: string;
+  messageCount: number;
+  lastMessageAt: string;
+}
+
+export interface Analytics {
+  users: { total: number; byRole: Record<string, number>; suspended: number };
+  doubts: {
+    total: number;
+    byStatus: Record<string, number>;
+    resolutionRate: number;
+    perDay: { _id: string; n: number }[];
+    bySubject: { subject: string; total: number; open: number }[];
+  };
+  ai: { avgConfidence: number | null; answeredByAi: number; routedToMentors: number; routingRate: number | null };
+  mentors: {
+    avgResponseMinutes: number | null;
+    acceptedDoubts: number;
+    top: { _id: string; name: string; reputationScore?: number; ratingsCount?: number; resolvedDoubtsCount?: number; avgResponseMinutes?: number; verifiedBadge?: boolean }[];
+  };
+  ratings: Record<string, { count: number; clarity: number; helpfulness: number; responseTime: number }>;
+  moderation: { openReports: number };
 }
 
 export interface SystemStatus {

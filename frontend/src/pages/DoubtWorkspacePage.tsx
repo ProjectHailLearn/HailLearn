@@ -22,10 +22,12 @@ import { Doubt } from '../types';
 import { doubtService } from '../services/doubtService';
 import { mentorService } from '../services/mentorService';
 import { courseService } from '../services/courseService';
-import { Mentor, Course, DoubtStatus } from '../types';
+import { Mentor, Course, DoubtStatus, Difficulty } from '../types';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { RagSources } from '../components/doubts/RagSources';
 import { RoutingBanner } from '../components/doubts/RoutingBanner';
+import { RatingModal } from '../components/doubts/RatingModal';
+import { ReportButton } from '../components/common/ReportButton';
 
 const errorMessage = (err: unknown, fallback: string): string =>
   (err as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback;
@@ -48,6 +50,11 @@ export const DoubtWorkspacePage: React.FC = () => {
   const [archiveSearch, setArchiveSearch] = useState('');
   const [archiveCourse, setArchiveCourse] = useState('ALL');
   const [archiveStatus, setArchiveStatus] = useState<'ALL' | DoubtStatus>('ALL');
+  const [archiveDifficulty, setArchiveDifficulty] = useState<'ALL' | Difficulty>('ALL');
+  const [difficulty, setDifficulty] = useState<Difficulty>('Medium');
+  const [myMentorId, setMyMentorId] = useState<string | null>(null);
+  const [ratingOpen, setRatingOpen] = useState(false);
+  const [rerunning, setRerunning] = useState(false);
   const [mineOnly, setMineOnly] = useState(false);
   const [selectedMentorForEscalation, setSelectedMentorForEscalation] = useState('');
   const [answerText, setAnswerText] = useState('');
@@ -82,6 +89,8 @@ export const DoubtWorkspacePage: React.FC = () => {
 
   useEffect(() => {
     mentorService.getAll().then(setMentors).catch(console.error);
+    // Mentors/faculty: needed to show Accept/Decline on doubts routed to them.
+    mentorService.getMine().then((m) => setMyMentorId(m?.id ?? null));
   }, []);
 
   const activeDoubt = doubts.find((d) => d.id === activeDoubtId) || doubts[0];
@@ -91,6 +100,7 @@ export const DoubtWorkspacePage: React.FC = () => {
     return (
       (archiveCourse === 'ALL' || d.courseCode === archiveCourse) &&
       (archiveStatus === 'ALL' || d.status === archiveStatus) &&
+      (archiveDifficulty === 'ALL' || d.difficulty === archiveDifficulty) &&
       (!mineOnly || d.author.id === user?.id) &&
       (!q || d.title.toLowerCase().includes(q) || d.tags.some((t) => t.toLowerCase().includes(q)))
     );
@@ -111,6 +121,7 @@ export const DoubtWorkspacePage: React.FC = () => {
         courseCode,
         tags: [subject.split(' ')[0], courseCode],
         depth,
+        difficulty,
       });
       setDoubts((prev) => [newDoubt, ...prev]);
       setActiveDoubtId(newDoubt.id);
@@ -235,6 +246,18 @@ export const DoubtWorkspacePage: React.FC = () => {
                     <option value="socratic">Socratic Hint Mode</option>
                   </select>
                 </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Difficulty</label>
+                  <select
+                    value={difficulty}
+                    onChange={(e) => setDifficulty(e.target.value as Difficulty)}
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-brand-500"
+                  >
+                    <option>Easy</option>
+                    <option>Medium</option>
+                    <option>Hard</option>
+                  </select>
+                </div>
               </div>
 
               <div>
@@ -310,6 +333,17 @@ export const DoubtWorkspacePage: React.FC = () => {
                   <option value="FACULTY_VERIFIED">Verified</option>
                   <option value="CLOSED">Closed</option>
                 </select>
+                <select
+                  value={archiveDifficulty}
+                  onChange={(e) => setArchiveDifficulty(e.target.value as typeof archiveDifficulty)}
+                  aria-label="Filter by difficulty"
+                  className="bg-slate-950 border border-slate-700/80 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none"
+                >
+                  <option value="ALL">Any level</option>
+                  <option>Easy</option>
+                  <option>Medium</option>
+                  <option>Hard</option>
+                </select>
                 <label className="flex items-center gap-1 text-xs text-slate-400 whitespace-nowrap">
                   <input type="checkbox" checked={mineOnly} onChange={(e) => setMineOnly(e.target.checked)} />
                   Mine
@@ -334,7 +368,10 @@ export const DoubtWorkspacePage: React.FC = () => {
                     <span className="text-[10px] font-mono font-medium text-brand-400 bg-brand-500/10 px-1.5 py-0.5 rounded">
                       {d.courseCode}
                     </span>
-                    <span className="text-[10px] text-slate-500">{d.createdAt}</span>
+                    <span className="flex items-center gap-1.5">
+                      <DifficultyTag level={d.difficulty} />
+                      <span className="text-[10px] text-slate-500">{d.createdAt}</span>
+                    </span>
                   </div>
                   <div className="text-xs font-semibold truncate text-slate-200">{d.title}</div>
                 </button>
@@ -354,6 +391,7 @@ export const DoubtWorkspacePage: React.FC = () => {
                       {activeDoubt.courseCode}
                     </span>
                     <span className="text-xs text-slate-400">• {activeDoubt.subject}</span>
+                    <DifficultyTag level={activeDoubt.difficulty} />
                   </div>
                   <Badge status={activeDoubt.status} dot>{activeDoubt.status.replace(/_/g, ' ')}</Badge>
                 </div>
@@ -384,13 +422,40 @@ export const DoubtWorkspacePage: React.FC = () => {
                     </button>
                     <span>•</span>
                     <span>{activeDoubt.views} Views</span>
+                    {activeDoubt.author.id !== user?.id && <ReportButton targetType="doubt" targetId={activeDoubt.id} />}
                   </div>
                 </div>
               </div>
 
+              {/* Mentor workflow: the assigned mentor accepts or passes the doubt */}
+              {activeDoubt.status === 'MENTOR_ESCALATED' && (activeDoubt.acceptedBy ? (
+                <div className="p-3 rounded-xl bg-purple-950/30 border border-purple-500/30 text-xs text-purple-200">
+                  {activeDoubt.acceptedBy.userId === user?.id ? 'You accepted this doubt — post your answer below.' : `${activeDoubt.acceptedBy.name} accepted this doubt and is working on it.`}
+                </div>
+              ) : activeDoubt.assignedMentor && activeDoubt.assignedMentor.id === myMentorId ? (
+                <div className="p-3 rounded-xl bg-purple-950/30 border border-purple-500/30 flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs text-purple-100">This doubt was routed to you.</span>
+                  <span className="flex gap-2">
+                    <Button size="sm" variant="secondary" className="text-xs" onClick={() => runAction(() => doubtService.decline(activeDoubt.id), 'Failed to decline')}>
+                      Pass to another mentor
+                    </Button>
+                    <Button size="sm" variant="gradient" className="text-xs" onClick={() => runAction(() => doubtService.accept(activeDoubt.id), 'Failed to accept')}>
+                      Accept doubt
+                    </Button>
+                  </span>
+                </div>
+              ) : null)}
+
+              {activeDoubt.rating && (
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-100">
+                  Rated by {activeDoubt.author.id === user?.id ? 'you' : 'the student'} — helpfulness {activeDoubt.rating.helpfulness}/5, clarity {activeDoubt.rating.clarity}/5, response time {activeDoubt.rating.responseTime}/5
+                  {activeDoubt.rating.comment ? `: “${activeDoubt.rating.comment}”` : ''}
+                </div>
+              )}
+
               {activeDoubt.aiSolution ? (
                 <div className="space-y-5">
-                  <RoutingBanner routing={activeDoubt.routing} confidence={activeDoubt.aiConfidenceScore} />
+                  <RoutingBanner routing={activeDoubt.routing} confidence={activeDoubt.aiConfidenceScore} sources={activeDoubt.retrievedSources} />
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -508,6 +573,7 @@ export const DoubtWorkspacePage: React.FC = () => {
                       <span className="font-semibold text-slate-200">{a.authorName}</span>
                       <span className="text-[10px] uppercase tracking-wider text-purple-300 bg-purple-500/10 px-1.5 py-0.5 rounded">{a.role}</span>
                       <span className="text-[10px] text-slate-500 ml-auto">{new Date(a.createdAt).toLocaleString()}</span>
+                      {a._id && a.authorId !== user?.id && <ReportButton targetType="answer" targetId={a._id} parentId={activeDoubt.id} />}
                     </div>
                     <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{a.content}</p>
                   </div>
@@ -543,7 +609,18 @@ export const DoubtWorkspacePage: React.FC = () => {
                       Verify & Add to Knowledge Vault
                     </Button>
                   )}
-                  {(activeDoubt.author.id === user?.id || canVerify) && activeDoubt.status !== 'CLOSED' && (
+                  {activeDoubt.author.id === user?.id && activeDoubt.status !== 'CLOSED' && !activeDoubt.rating && (
+                    <Button
+                      size="sm"
+                      variant="gradient"
+                      className="text-xs"
+                      leftIcon={<CheckCircle className="w-3.5 h-3.5" />}
+                      onClick={() => setRatingOpen(true)}
+                    >
+                      Mark Resolved & Rate
+                    </Button>
+                  )}
+                  {activeDoubt.author.id !== user?.id && canVerify && activeDoubt.status !== 'CLOSED' && (
                     <Button
                       size="sm"
                       variant="secondary"
@@ -551,11 +628,39 @@ export const DoubtWorkspacePage: React.FC = () => {
                       leftIcon={<XCircle className="w-3.5 h-3.5" />}
                       onClick={() => runAction(() => doubtService.close(activeDoubt.id), 'Failed to close')}
                     >
-                      Mark Resolved & Close
+                      Close
+                    </Button>
+                  )}
+                  {(activeDoubt.author.id === user?.id || isStaff) && !activeDoubt.acceptedBy &&
+                    (activeDoubt.status === 'AI_RESOLVED' || activeDoubt.status === 'MENTOR_ESCALATED') && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="text-xs"
+                      isLoading={rerunning}
+                      leftIcon={<Sparkles className="w-3.5 h-3.5" />}
+                      onClick={async () => {
+                        setRerunning(true);
+                        await runAction(() => doubtService.resolveAi(activeDoubt.id), 'Failed to re-run the AI');
+                        setRerunning(false);
+                      }}
+                      title="Search the Knowledge Vault again and regenerate the AI answer"
+                    >
+                      Re-run AI with latest knowledge
                     </Button>
                   )}
                 </div>
               </div>
+              {ratingOpen && (
+                <RatingModal
+                  resolvedBy={activeDoubt.acceptedBy?.name || activeDoubt.answers?.filter((a) => a.role !== 'student').slice(-1)[0]?.authorName || 'the AI'}
+                  onClose={() => setRatingOpen(false)}
+                  onSubmit={async (scores) => {
+                    replaceDoubt(await doubtService.confirm(activeDoubt.id, scores));
+                    setRatingOpen(false);
+                  }}
+                />
+              )}
             </Card>
           ) : (
             <div className="h-full flex items-center justify-center p-12 text-slate-500">
@@ -567,3 +672,12 @@ export const DoubtWorkspacePage: React.FC = () => {
     </div>
   );
 };
+
+const DIFFICULTY_STYLES: Record<Difficulty, string> = {
+  Easy: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
+  Medium: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
+  Hard: 'text-rose-300 bg-rose-500/10 border-rose-500/20',
+};
+
+const DifficultyTag: React.FC<{ level?: Difficulty }> = ({ level }) =>
+  level ? <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${DIFFICULTY_STYLES[level]}`}>{level}</span> : null;

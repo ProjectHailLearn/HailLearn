@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
+import { AvailabilityCard } from '../components/settings/AvailabilityCard';
 import { useAppDispatch, useAppSelector } from '../store';
 import { updateProfile } from '../store/slices/authSlice';
 import { authService } from '../services/authService';
@@ -263,6 +264,8 @@ const ChangePasswordCard: React.FC = () => {
 
   return (
     <form onSubmit={handleSubmit}>
+      <AvailabilityCard />
+
       <Card variant="glass" className="p-6 space-y-4">
         <div className="flex items-center gap-2.5 pb-3 border-b border-slate-800">
           <KeyRound className="w-5 h-5 text-amber-400" />

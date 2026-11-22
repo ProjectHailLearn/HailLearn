@@ -135,21 +135,30 @@ All routes except register/login require `Authorization: Bearer <token>`.
 
 | Method | Route | Notes |
 |---|---|---|
-| POST | `/api/auth/register`, `/api/auth/login` | roles: student, mentor, faculty |
+| POST | `/api/auth/register`, `/api/auth/login` | roles: student, mentor, faculty; signup emails a 6-digit code, login returns access + refresh tokens |
+| POST | `/api/auth/verify-email`, `/api/auth/resend-verification` | confirm the signup code (signs in) |
+| POST | `/api/auth/refresh`, `/api/auth/logout` | rotate / revoke the refresh token (15-min access tokens) |
 | GET/PUT | `/api/auth/me` | profile + preferences |
 | POST | `/api/auth/forgot-password`, `/api/auth/reset-password` | rate-limited; reset links expire after 1 hour |
 | PUT | `/api/auth/password` | change password (requires current) |
-| GET/POST | `/api/doubts` | filters: `status`, `mine`, `courseCode`, `search`; POST runs the AI |
+| GET/POST | `/api/doubts` | filters: `status`, `mine`, `courseCode`, `difficulty`, `search`; POST runs RAG + confidence gate |
+| POST | `/api/doubts/:id/resolve-ai` | re-run retrieval, AI and the gate |
+| POST | `/api/doubts/:id/accept`, `/decline` | assigned mentor accepts, or passes to the next-best mentor |
+| POST | `/api/doubts/:id/confirm` | student rates clarity/helpfulness/response time (1–5) and closes |
 | GET | `/api/doubts/:id` | increments views |
 | PUT | `/api/doubts/:id/upvote` · `/escalate` · `/close` | upvote once per user |
 | POST | `/api/doubts/:id/answer` | mentor/faculty/admin |
 | PUT | `/api/doubts/:id/verify` | faculty/admin; publishes to Knowledge Vault |
-| GET | `/api/mentors` | |
+| GET | `/api/mentors`, `/api/mentors/me` | reputation, verified badge, online/available now |
+| GET/PATCH | `/api/mentors/:id/availability` | weekly slots, timezone, accepting routed doubts |
+| POST | `/api/flags` | report a doubt, answer, chat message or vault entry |
 | GET/POST, PUT | `/api/requests`, `/api/requests/:id` | mentorship requests; accept/decline |
 | GET/POST | `/api/requests/:id/messages` | chat on accepted requests; pushed via Socket.IO `message` |
 | GET, PUT | `/api/knowledge`, `/categories`, `/:id/upvote`, `/:id/view` | |
 | GET, PUT | `/api/courses`, `/api/courses/:id/enroll`, `/api/courses/:id` | edit: faculty/admin |
 | GET, PUT, POST, DELETE | `/api/admin/users`, `/users/:id/role`, `/mentors`, `/mentors/:id/link`, `/courses` | admin only |
+| POST, PUT | `/api/admin/users/:id/suspend`, `/unsuspend`, `/mentors/:id/badge` | admin: suspension (immediate), verified badge |
+| GET, POST | `/api/admin/flags`, `/flags/:id/resolve`, `/conversations`, `/conversations/:id/messages`, `/analytics`, `/search/reindex` | admin: reports, transcripts, analytics, search index |
 | GET | `/api/system` | AI provider status, online mentor count |
 | GET/POST, PUT, DELETE | `/api/rooms`, `/:id/join`, `/:id` | study rooms |
 | GET, PUT | `/api/notifications`, `/:id/read`, `/read-all` | also pushed via Socket.IO `notification` |

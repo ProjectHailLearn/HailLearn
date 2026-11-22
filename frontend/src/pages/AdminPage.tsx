@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Shield, Search, Link2, Plus, Trash2 } from 'lucide-react';
 import { Card } from '../components/common/Card';
+import { AnalyticsPanel } from '../components/admin/AnalyticsPanel';
+import { ModerationPanel, TranscriptsPanel } from '../components/admin/ModerationPanel';
 import { Button } from '../components/common/Button';
 import { Avatar } from '../components/common/Avatar';
 import { adminService } from '../services/adminService';
@@ -24,6 +26,7 @@ export const AdminPage: React.FC = () => {
   const [newCourse, setNewCourse] = useState({ code: '', title: '', subject: '', instructor: '', credits: '3', category: '', nextLecture: '' });
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [tab, setTab] = useState<'overview' | 'people' | 'moderation' | 'conversations' | 'courses'>('overview');
 
   const staffUsers = users.filter((u) => u.role === 'mentor' || u.role === 'faculty');
 
@@ -79,12 +82,33 @@ export const AdminPage: React.FC = () => {
           <Shield className="w-6 h-6 text-rose-400" />
           Admin Console
         </h1>
-        <p className="text-xs text-slate-400">Manage roles, mentor profiles and the course catalog</p>
+        <p className="text-xs text-slate-400">Analytics, users, moderation, chat transcripts and the course catalog</p>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5" role="tablist">
+        {([
+          ['overview', 'Analytics'], ['people', 'Users & Mentors'], ['moderation', 'Reports'], ['conversations', 'Chat transcripts'], ['courses', 'Courses'],
+        ] as const).map(([id, label]) => (
+          <button
+            key={id}
+            role="tab"
+            aria-selected={tab === id}
+            onClick={() => setTab(id)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${tab === id ? 'bg-rose-600 text-white' : 'bg-slate-950/60 text-slate-400 border border-slate-800 hover:text-slate-200'}`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {error && <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300">{error}</div>}
       {notice && <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-300">{notice}</div>}
 
+      {tab === 'overview' && <AnalyticsPanel />}
+      {tab === 'moderation' && <Card variant="glass" className="p-5"><ModerationPanel /></Card>}
+      {tab === 'conversations' && <Card variant="glass" className="p-5"><TranscriptsPanel /></Card>}
+
+      {tab === 'people' && (<>
       {/* Users */}
       <Card variant="glass" className="p-5 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -106,10 +130,32 @@ export const AdminPage: React.FC = () => {
               <div className="flex items-center gap-3 min-w-0">
                 <Avatar src={u.avatar} name={u.name} size="sm" />
                 <div className="min-w-0">
-                  <div className="text-xs font-semibold text-white truncate">{u.name}</div>
+                  <div className="text-xs font-semibold text-white truncate flex items-center gap-1.5">
+                    {u.name}
+                    {u.suspended && <span className="text-[10px] font-semibold text-rose-300 bg-rose-500/10 border border-rose-500/30 px-1.5 rounded-full" title={u.suspendedReason}>suspended</span>}
+                    {!u.emailVerified && <span className="text-[10px] text-amber-300 bg-amber-500/10 border border-amber-500/30 px-1.5 rounded-full">unverified</span>}
+                  </div>
                   <div className="text-[11px] text-slate-400 truncate">{u.email} · {u.department} · {u.karmaPoints} karma</div>
                 </div>
               </div>
+              <div className="flex items-center gap-2">
+              {u.id !== me?.id && (u.suspended ? (
+                <Button size="sm" variant="secondary" className="text-xs" onClick={() => run(() => adminService.unsuspend(u.id), `${u.name} restored`, loadUsers)}>
+                  Restore
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="danger"
+                  className="text-xs"
+                  onClick={() => {
+                    const reason = window.prompt(`Suspend ${u.name}? They are signed out immediately and emailed. Reason (optional):`);
+                    if (reason !== null) run(() => adminService.suspend(u.id, reason || undefined), `${u.name} suspended`, loadUsers);
+                  }}
+                >
+                  Suspend
+                </Button>
+              ))}
               <select
                 value={u.role}
                 disabled={u.id === me?.id}
@@ -119,6 +165,7 @@ export const AdminPage: React.FC = () => {
               >
                 {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
+              </div>
             </div>
           ))}
           {users.length === 0 && <div className="py-4 text-xs text-slate-500 text-center">No users match.</div>}
@@ -138,8 +185,17 @@ export const AdminPage: React.FC = () => {
                 <div className="text-xs font-semibold text-white">{p.name}</div>
                 <div className="text-[11px] text-slate-400">
                   {p.department} · {p.linkedEmail ? <span className="text-emerald-400">linked to {p.linkedEmail}</span> : <span className="text-amber-400">not linked</span>}
+                  {p.userId && <> · reputation {p.reputationScore.toFixed(2)} ({p.ratingsCount} ratings)</>}
                 </div>
               </div>
+              <label className="flex items-center gap-1.5 text-[11px] text-slate-300" title="Show a verified badge on this mentor's profile">
+                <input
+                  type="checkbox"
+                  checked={p.verifiedBadge}
+                  onChange={(e) => run(() => adminService.setBadge(p.id, e.target.checked), `${p.name} ${e.target.checked ? 'verified' : 'badge removed'}`, loadProfiles)}
+                />
+                Verified badge
+              </label>
               {!p.userId && (
                 <div className="flex gap-2">
                   <select
@@ -170,7 +226,10 @@ export const AdminPage: React.FC = () => {
         )}
       </Card>
 
-      {/* Courses */}
+      </>)}
+
+      {tab === 'courses' && (
+      /* Courses */
       <Card variant="glass" className="p-5 space-y-4">
         <h2 className="text-sm font-bold text-white">Course Catalog</h2>
         <div className="divide-y divide-slate-800">
@@ -208,6 +267,7 @@ export const AdminPage: React.FC = () => {
           </Button>
         </form>
       </Card>
+      )}
     </div>
   );
 };

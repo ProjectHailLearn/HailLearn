@@ -83,7 +83,7 @@ export const QuickAskCard: React.FC = () => {
 
           {answer.aiSolution ? (
             <>
-              <RoutingBanner routing={answer.routing} confidence={answer.aiConfidenceScore} />
+              <RoutingBanner routing={answer.routing} confidence={answer.aiConfidenceScore} sources={answer.retrievedSources} />
               <div className="p-4 rounded-xl bg-brand-950/40 border border-brand-500/30 text-sm text-slate-200 leading-relaxed">
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <strong className="text-brand-300 flex items-center gap-1.5">
