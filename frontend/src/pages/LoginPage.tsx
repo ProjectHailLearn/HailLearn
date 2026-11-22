@@ -3,13 +3,14 @@ import { Link, useNavigate } from 'react-router-dom';
 import { GraduationCap, Sparkles, Eye, EyeOff, Flame, BookOpen, Users } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store';
 import { loginThunk, registerThunk, clearError } from '../store/slices/authSlice';
+import { VerifyEmailStep } from '../components/auth/VerifyEmailStep';
 
 type Mode = 'login' | 'register';
 
 export const LoginPage: React.FC = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const { isAuthenticated, isLoading, error } = useAppSelector((s) => s.auth);
+  const { isAuthenticated, isLoading, error, pendingVerificationEmail } = useAppSelector((s) => s.auth);
 
   const [mode, setMode] = useState<Mode>('login');
   const [showPassword, setShowPassword] = useState(false);
@@ -93,6 +94,7 @@ export const LoginPage: React.FC = () => {
 
         {/* Card */}
         <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 rounded-2xl shadow-2xl overflow-hidden">
+          {pendingVerificationEmail ? <VerifyEmailStep email={pendingVerificationEmail} /> : (<>
           {/* Tab Toggle */}
           <div className="flex border-b border-slate-800">
             {(['login', 'register'] as Mode[]).map((m) => (
@@ -267,6 +269,7 @@ export const LoginPage: React.FC = () => {
               </span>
             </button>
           </form>
+          </>)}
         </div>
 
         <p className="text-center text-xs text-slate-500 mt-6">

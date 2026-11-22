@@ -20,6 +20,8 @@ export const sendEmail = async (to: string, subject: string, text: string): Prom
     return true;
   } catch (err) {
     console.error('[email] send failed:', (err as Error).message);
+    // In development, print the message so codes and links are still usable.
+    if (process.env.NODE_ENV !== 'production') console.log(`[email:dev] To: ${to}\nSubject: ${subject}\n${text}`);
     return false;
   }
 };

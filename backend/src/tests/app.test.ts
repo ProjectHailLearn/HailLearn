@@ -1,6 +1,7 @@
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { createApp } from '../app.js';
+import { User } from '../models/User.js';
 
 // These routes reject before touching MongoDB, so no database is needed.
 describe('HTTP app', () => {
@@ -37,6 +38,16 @@ describe('HTTP app', () => {
     expect(res.body.message).toMatch(/name/);
   });
 
+  it('validates the email verification code format', async () => {
+    const res = await request(app).post('/api/auth/verify-email').send({ email: 'a@b.com', code: '12ab' });
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/code/);
+  });
+
+  it('rejects malformed refresh tokens', async () => {
+    expect((await request(app).post('/api/auth/refresh').send({ refreshToken: 'short' })).status).toBe(400);
+  });
+
   it('rejects malformed reset tokens', async () => {
     const res = await request(app).post('/api/auth/reset-password').send({ token: 'abc', password: 'secret12' });
     expect(res.status).toBe(400);
@@ -48,6 +59,24 @@ describe('HTTP app', () => {
 
   describe('with a valid token', () => {
     const token = () => jwt.sign({ userId: '6ad73a1339df3b78709785bc', role: 'student' }, 'test-secret');
+    // protect() loads the user to check suspension and role; stand in for MongoDB with an active student.
+    const mockUser = (user: { role: string; suspended?: boolean } | null) =>
+      jest.spyOn(User, 'findById').mockReturnValue({ select: () => ({ lean: async () => user }) } as never);
+    beforeEach(() => mockUser({ role: 'student', suspended: false }));
+    afterEach(() => jest.restoreAllMocks());
+
+    it('blocks suspended accounts immediately', async () => {
+      mockUser({ role: 'student', suspended: true });
+      const res = await request(app).get('/api/doubts').set('Authorization', `Bearer ${token()}`);
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe('ACCOUNT_SUSPENDED');
+    });
+
+    it('uses the current role from the database, not the token', async () => {
+      mockUser({ role: 'student' });
+      const admin = jwt.sign({ userId: '6ad73a1339df3b78709785bc', role: 'admin' }, 'test-secret');
+      expect((await request(app).get('/api/admin/users').set('Authorization', `Bearer ${admin}`)).status).toBe(403);
+    });
 
     it('rejects malformed ids with 400', async () => {
       const res = await request(app).put('/api/doubts/not-an-id/upvote').set('Authorization', `Bearer ${token()}`);

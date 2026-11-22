@@ -30,6 +30,8 @@ import { notificationService, toNotification } from '../services/notificationSer
 import { connectSocket, disconnectSocket, isSocketConnected } from '../services/socketService';
 import { presenceService } from '../services/presenceService';
 import { logout } from '../store/slices/authSlice';
+import { authService } from '../services/authService';
+import { REFRESH_KEY } from '../services/api';
 import { systemService } from '../services/adminService';
 import { SystemStatus } from '../types';
 import { Avatar } from '../components/common/Avatar';
@@ -46,6 +48,8 @@ export const DashboardLayout: React.FC = () => {
   const token = useAppSelector((state) => state.auth.token);
   const handleLogout = () => {
     if (token) presenceService.goOffline(token).catch(() => {});
+    // Revoke this device's refresh token in the background; local sign-out doesn't wait for it.
+    authService.logout(localStorage.getItem(REFRESH_KEY)).catch(() => {});
     disconnectSocket();
     dispatch(logout());
     navigate('/login');

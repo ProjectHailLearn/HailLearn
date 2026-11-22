@@ -1,26 +1,44 @@
 import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
+import { User } from '../models/User.js';
+import { jwtSecret } from '../services/tokenService.js';
 
 export interface AuthRequest extends Request {
   userId?: string;
   userRole?: string;
 }
 
-export const protect = (req: AuthRequest, res: Response, next: NextFunction): void => {
+export const protect = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) {
     res.status(401).json({ success: false, message: 'No token provided' });
     return;
   }
 
+  let decoded: { userId: string; role: string };
   try {
-    const token = auth.replace('Bearer ', '');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev_haillearn_jwt_secret_key_2026_super_secure') as { userId: string; role: string };
-    req.userId = decoded.userId;
-    req.userRole = decoded.role;
-    next();
+    decoded = jwt.verify(auth.replace('Bearer ', ''), jwtSecret()) as { userId: string; role: string };
   } catch {
     res.status(401).json({ success: false, message: 'Invalid or expired token' });
+    return;
+  }
+
+  // Suspension and role changes take effect immediately, not when the access token expires.
+  try {
+    const user = await User.findById(decoded.userId).select('role suspended').lean<{ role: string; suspended?: boolean }>();
+    if (!user) {
+      res.status(401).json({ success: false, message: 'Account no longer exists' });
+      return;
+    }
+    if (user.suspended) {
+      res.status(403).json({ success: false, code: 'ACCOUNT_SUSPENDED', message: 'This account is suspended.' });
+      return;
+    }
+    req.userId = decoded.userId;
+    req.userRole = user.role;
+    next();
+  } catch (err) {
+    next(err);
   }
 };
 

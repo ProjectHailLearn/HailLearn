@@ -13,6 +13,7 @@ export interface User {
   rating?: number;
   specializations?: string[];
   preferences?: { aiModel: string; emailNotifications: boolean };
+  emailVerified?: boolean;
 }
 
 export type DoubtStatus = 

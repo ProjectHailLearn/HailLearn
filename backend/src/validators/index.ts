@@ -32,6 +32,17 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'is required'),
 });
 
+export const verifyEmailSchema = z.object({
+  email: z.string().trim().toLowerCase().email('must be a valid email'),
+  code: z.string().trim().regex(/^\d{6}$/, 'must be the 6-digit code'),
+});
+
+export const emailOnlySchema = z.object({
+  email: z.string().trim().toLowerCase().email('must be a valid email'),
+});
+
+export const refreshSchema = z.object({ refreshToken: z.string().min(30).max(200) });
+
 export const createDoubtSchema = z.object({
   title: z.string().trim().min(5, 'must be at least 5 characters').max(200),
   description: z.string().trim().min(5, 'must be at least 5 characters').max(5000),

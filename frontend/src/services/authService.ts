@@ -12,9 +12,21 @@ export const authService = {
     const res = await api.post('/auth/login', payload);
     return res.data.data;
   },
-  register: async (payload: RegisterPayload) => {
+  // Returns { email, needsVerification }: no session until the emailed code is confirmed.
+  register: async (payload: RegisterPayload): Promise<{ email: string; needsVerification: boolean }> => {
     const res = await api.post('/auth/register', payload);
     return res.data.data;
+  },
+  verifyEmail: async (email: string, code: string): Promise<{ token: string; refreshToken: string; user: User }> => {
+    const res = await api.post('/auth/verify-email', { email, code });
+    return res.data.data;
+  },
+  resendVerification: async (email: string): Promise<string> => {
+    const res = await api.post('/auth/resend-verification', { email });
+    return res.data.message;
+  },
+  logout: async (refreshToken: string | null): Promise<void> => {
+    if (refreshToken) await api.post('/auth/logout', { refreshToken });
   },
   updateMe: async (payload: Partial<Pick<User, 'name' | 'department' | 'university' | 'semester' | 'avatar' | 'specializations' | 'preferences'>>): Promise<User> => {
     const res = await api.put('/auth/me', payload);
@@ -24,7 +36,7 @@ export const authService = {
     const res = await api.post('/auth/forgot-password', { email });
     return res.data.message;
   },
-  resetPassword: async (token: string, password: string): Promise<{ token: string; user: User }> => {
+  resetPassword: async (token: string, password: string): Promise<{ token: string; refreshToken: string; user: User }> => {
     const res = await api.post('/auth/reset-password', { token, password });
     return res.data.data;
   },

@@ -1,8 +1,11 @@
 import { Router } from 'express';
-import { register, login, getMe, updateMe, forgotPassword, resetPassword, changePassword } from '../controllers/authController.js';
+import {
+  register, login, getMe, updateMe, forgotPassword, resetPassword, changePassword, verifyEmail, resendVerification, refresh, logout,
+} from '../controllers/authController.js';
 import { protect } from '../middlewares/auth.js';
 import {
   validate, registerSchema, loginSchema, updateProfileSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema,
+  verifyEmailSchema, emailOnlySchema, refreshSchema,
 } from '../validators/index.js';
 import rateLimit from 'express-rate-limit';
 
@@ -14,6 +17,10 @@ const router = Router();
 
 router.post('/register', validate(registerSchema), register);
 router.post('/login', loginLimiter, validate(loginSchema), login);
+router.post('/verify-email', sensitiveLimiter, validate(verifyEmailSchema), verifyEmail);
+router.post('/resend-verification', sensitiveLimiter, validate(emailOnlySchema), resendVerification);
+router.post('/refresh', loginLimiter, validate(refreshSchema), refresh);
+router.post('/logout', logout);
 router.get('/me', protect, getMe);
 router.put('/me', protect, validate(updateProfileSchema), updateMe);
 router.post('/forgot-password', sensitiveLimiter, validate(forgotPasswordSchema), forgotPassword);

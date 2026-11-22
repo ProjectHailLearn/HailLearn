@@ -16,6 +16,15 @@ export interface IUser extends Document {
   preferences: { aiModel: string; emailNotifications: boolean };
   passwordResetHash?: string;
   passwordResetExpires?: Date;
+  // Email verification by 6-digit code (FR-1.1). Accounts created before verification existed were migrated to true.
+  emailVerified: boolean;
+  emailOtpHash?: string;
+  emailOtpExpires?: Date;
+  emailOtpAttempts?: number;
+  // Hashed refresh tokens, one per signed-in device (rotated on every refresh).
+  refreshTokens: { hash: string; expiresAt: Date }[];
+  suspended: boolean;
+  suspendedReason?: string;
   comparePassword(candidate: string): Promise<boolean>;
 }
 
@@ -38,6 +47,13 @@ const UserSchema = new Schema<IUser>(
     },
     passwordResetHash: { type: String, select: false },
     passwordResetExpires: { type: Date, select: false },
+    emailVerified: { type: Boolean, default: false },
+    emailOtpHash: { type: String, select: false },
+    emailOtpExpires: { type: Date, select: false },
+    emailOtpAttempts: { type: Number, select: false },
+    refreshTokens: { type: [{ _id: false, hash: String, expiresAt: Date }], default: [], select: false },
+    suspended: { type: Boolean, default: false },
+    suspendedReason: { type: String },
   },
   { timestamps: true }
 );
