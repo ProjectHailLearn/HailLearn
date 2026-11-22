@@ -21,6 +21,7 @@ export const knowledgeService = {
       content: k.content as string | undefined,
       doubtId: k.doubtId as string | undefined,
       similarityScore: k.similarityScore as number | undefined,
+      highlights: (k.highlights as string[] | undefined) ?? [],
       hasUpvoted: (k.hasUpvoted as boolean) || false,
     }));
   },

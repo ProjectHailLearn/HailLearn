@@ -168,6 +168,13 @@ export const KnowledgeVaultPage: React.FC = () => {
             <p className="text-xs text-slate-300 leading-relaxed mb-4 line-clamp-3">
               {item.snippet}
             </p>
+            {!!item.highlights?.length && (
+              <div className="mb-4 space-y-1 border-l-2 border-emerald-500/40 pl-3">
+                {item.highlights.map((h) => (
+                  <p key={h} className="text-[11px] italic text-emerald-200/80 leading-relaxed">“{h}”</p>
+                ))}
+              </div>
+            )}
 
             {/* Tags */}
             <div className="flex flex-wrap gap-1.5 mb-4">

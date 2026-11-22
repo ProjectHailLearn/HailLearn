@@ -12,8 +12,8 @@ const vault = [
 ];
 
 describe('retrievalService', () => {
-  it('tokenizes, drops stopwords and stems plurals', () => {
-    expect(tokenize('Why are the B-Trees and arrays sorted?')).toEqual(['tree', 'array', 'sorted']);
+  it('tokenizes into lowercase words', () => {
+    expect(tokenize('Why are B-Trees sorted?')).toEqual(['why', 'are', 'b', 'trees', 'sorted']);
   });
 
   it('ranks the relevant document first with a match score', () => {

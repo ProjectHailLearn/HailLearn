@@ -7,6 +7,7 @@ import { AuthRequest } from '../middlewares/auth.js';
 import { solveDoubt } from '../services/aiService.js';
 import { retrieveForQuestion } from '../services/retrievalService.js';
 import { decideRouting, rankMentorsForDoubt } from '../services/routingService.js';
+import { indexKnowledgeItem, indexMentorByUserId } from '../search/indexers.js';
 import { notify } from '../services/notificationService.js';
 import { knowledgeContentFromDoubt } from '../utils/knowledge.js';
 
@@ -202,6 +203,8 @@ export const answerDoubt = async (req: AuthRequest, res: Response): Promise<void
     const doubt = await Doubt.findByIdAndUpdate(req.params.id, update, { new: true });
     await User.findByIdAndUpdate(user._id, { $inc: { karmaPoints: 10 } });
     await Mentor.findOneAndUpdate({ userId: user._id.toString() }, { $inc: { resolvedDoubtsCount: 1, karmaPoints: 10 } });
+    // Answered doubts are part of the mentor's expertise profile used for routing.
+    await indexMentorByUserId(user._id.toString()).catch(() => undefined);
     await notify(existing.author.id, {
       type: 'mentor',
       title: 'New answer on your doubt',
@@ -223,7 +226,7 @@ export const verifyDoubt = async (req: AuthRequest, res: Response): Promise<void
     // Verified doubts become institutional knowledge.
     const lastAnswer = doubt.answers[doubt.answers.length - 1];
     const snippet = (lastAnswer?.content || doubt.aiSolution?.summary || doubt.description).slice(0, 500);
-    await KnowledgeItem.findOneAndUpdate(
+    const published = await KnowledgeItem.findOneAndUpdate(
       { title: doubt.title, courseCode: doubt.courseCode },
       {
         $set: {
@@ -237,8 +240,9 @@ export const verifyDoubt = async (req: AuthRequest, res: Response): Promise<void
         },
         $setOnInsert: { upvotes: doubt.upvotes, views: doubt.views },
       },
-      { upsert: true }
+      { upsert: true, new: true }
     );
+    if (published) await indexKnowledgeItem(String(published._id)).catch((err) => console.error('[search] index failed:', err.message));
     if (lastAnswer) await User.findByIdAndUpdate(lastAnswer.authorId, { $inc: { karmaPoints: 15 } });
 
     await notify(doubt.author.id, {

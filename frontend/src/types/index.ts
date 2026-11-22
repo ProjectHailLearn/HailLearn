@@ -209,6 +209,7 @@ export interface KnowledgeItem {
   content?: string;
   doubtId?: string;
   similarityScore?: number;
+  highlights?: string[]; // matching sentences when searching
   hasUpvoted?: boolean;
 }
 

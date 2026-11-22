@@ -12,8 +12,8 @@ export const getKnowledgeItems = async (req: AuthRequest, res: Response): Promis
 
     if (typeof category === 'string' && category && category !== 'ALL') query.category = category;
     const q = typeof search === 'string' ? search.trim() : '';
-    const toJson = (i: InstanceType<typeof KnowledgeItem>, similarityScore?: number) => ({
-      ...i.toObject(), similarityScore, hasUpvoted: i.upvotedBy.includes(req.userId!), upvotedBy: undefined,
+    const toJson = (i: InstanceType<typeof KnowledgeItem>, similarityScore?: number, highlights?: string[]) => ({
+      ...i.toObject(), similarityScore, highlights, hasUpvoted: i.upvotedBy.includes(req.userId!), upvotedBy: undefined,
     });
 
     if (!q) {
@@ -22,16 +22,23 @@ export const getKnowledgeItems = async (req: AuthRequest, res: Response): Promis
       return;
     }
 
-    // Ranked search (same BM25 retrieval the AI uses), plus plain substring hits for things like course codes.
-    const ranked = await searchVault(q);
+    // Ranked hybrid search (the same engine the AI uses), plus plain substring hits for things like course codes.
+    const ranked = await searchVault(q, typeof query.category === 'string' ? query.category : undefined);
     const rx = { $regex: escapeRegex(q), $options: 'i' };
     const substring = await KnowledgeItem.find({ ...query, $or: [{ title: rx }, { snippet: rx }, { tags: rx }, { courseCode: rx }] }, { _id: 1 });
     const ids = [...new Set([...ranked.map((r) => r.id), ...substring.map((d) => String(d._id))])];
     const items = await KnowledgeItem.find({ ...query, _id: { $in: ids } });
     const order = new Map(ids.map((id, i) => [id, i]));
-    const match = new Map(ranked.map((r) => [r.id, r.match]));
+    const hit = new Map(ranked.map((r) => [r.id, r]));
     items.sort((a, b) => (order.get(String(a._id)) ?? 0) - (order.get(String(b._id)) ?? 0));
-    res.json({ success: true, data: items.map((i) => toJson(i, match.get(String(i._id)))) });
+    res.json({
+      success: true,
+      data: items.map((i) => {
+        const h = hit.get(String(i._id));
+        // Shown as "% match": keyword coverage, or vector similarity for typo/near matches.
+        return toJson(i, h ? Math.max(h.match, h.vectorScore) : undefined, h?.highlights);
+      }),
+    });
   } catch {
     res.status(500).json({ success: false, message: 'Failed to fetch knowledge items' });
   }

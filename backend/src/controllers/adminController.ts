@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import { indexMentorByUserId } from '../search/indexers.js';
 import { User } from '../models/User.js';
 import { Mentor } from '../models/Mentor.js';
 import { MentorRequest } from '../models/MentorRequest.js';
@@ -100,6 +101,7 @@ export const linkMentorProfile = async (req: AuthRequest, res: Response): Promis
       await existing.deleteOne();
     }
     await mentor.updateOne({ userId });
+    await indexMentorByUserId(userId).catch(() => undefined);
     // Pending requests sent to this profile before it was linked now reach the account.
     await MentorRequest.updateMany({ mentorId: mentor._id.toString() }, { mentorUserId: userId });
     await notify(userId, {

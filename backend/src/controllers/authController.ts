@@ -5,6 +5,7 @@ import { User, IUser } from '../models/User.js';
 import { Mentor } from '../models/Mentor.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { notify } from '../services/notificationService.js';
+import { indexMentorByUserId } from '../search/indexers.js';
 import { issueSession, rotateRefreshToken, revokeRefreshToken, revokeAllSessions } from '../services/tokenService.js';
 
 const hashToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
@@ -64,6 +65,7 @@ export const syncMentorProfile = async (user: IUser): Promise<void> => {
     },
     { upsert: true }
   );
+  await indexMentorByUserId(user._id.toString()).catch(() => undefined);
 };
 
 export const register = async (req: Request, res: Response): Promise<void> => {

@@ -2,6 +2,8 @@ import { Mentor } from '../models/Mentor.js';
 import { Doubt } from '../models/Doubt.js';
 import { rankDocuments, RetrievableDoc } from './retrievalService.js';
 import { isOnline } from './presenceService.js';
+import { search } from '../search/engine.js';
+import { ensureIndex } from '../search/indexers.js';
 
 // Confidence gate: an AI answer below this score (0-100) is sent to a mentor instead of being served
 // as the resolution. Below 70 the prompt's rubric means "ambiguous, missing information, or unsure".
@@ -55,7 +57,13 @@ export interface MentorCandidate {
 // rank = 0.6 × relevance + 0.25 × reputation + 0.15 × online.
 // Relevance dominates; reputation stops a barely-relevant mentor outranking a proven one; being online
 // breaks near-ties in favour of someone who can answer now.
-export const rankMentorProfiles = (question: string, courseCode: string, mentors: MentorProfile[]): MentorCandidate[] => {
+// `relevance` comes from the persisted mentors index when available; otherwise it's computed in memory.
+export const rankMentorProfiles = (
+  question: string,
+  courseCode: string,
+  mentors: MentorProfile[],
+  relevanceById?: Map<string, number>
+): MentorCandidate[] => {
   if (!mentors.length) return [];
   const docs: RetrievableDoc[] = mentors.map((m) => ({
     id: m.id,
@@ -67,7 +75,7 @@ export const rankMentorProfiles = (question: string, courseCode: string, mentors
     tags: m.specializations,
     text: [m.bio, ...m.answeredTitles].join('\n'),
   }));
-  const relevance = new Map(rankDocuments(`${courseCode} ${question}`, docs, { limit: docs.length }).map((r) => [r.id, r.match]));
+  const relevance = relevanceById ?? new Map(rankDocuments(`${courseCode} ${question}`, docs, { limit: docs.length }).map((r) => [r.id, r.match]));
   const maxKarma = Math.max(1, ...mentors.map((m) => m.karmaPoints));
 
   return mentors
@@ -101,6 +109,13 @@ export const rankMentorsForDoubt = async (question: string, courseCode: string, 
   ]);
   const titlesByUser = new Map(answered.map((a) => [a._id, a.titles.slice(0, 50)]));
 
+  // Topical relevance from the mentors index (specializations, bio, answered doubts): keyword coverage,
+  // or vector similarity when it's a strong near-match (e.g. a misspelt topic).
+  await ensureIndex('mentors');
+  const hits = await search('mentors', `${courseCode} ${question}`, { limit: 200, minVector: { semantic: 0.65, ngram: 0.6 } });
+  const strongVector = (h: (typeof hits)[number]) => h.vectorScore >= (h.vectorKind === 'semantic' ? 0.65 : 0.6);
+  const relevance = new Map(hits.map((h) => [h.id, Math.max(h.match, strongVector(h) ? h.vectorScore : 0)]));
+
   return rankMentorProfiles(
     question,
     courseCode,
@@ -116,6 +131,7 @@ export const rankMentorsForDoubt = async (question: string, courseCode: string, 
       rating: m.rating ?? 4.5,
       online: isOnline(m.lastSeenAt),
       answeredTitles: titlesByUser.get(m.userId as string) ?? [],
-    }))
+    })),
+    relevance
   );
 };
