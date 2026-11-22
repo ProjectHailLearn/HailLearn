@@ -48,7 +48,7 @@ export const stem = (t: string): string => {
     w = /([^aeiouslz])\1$/.test(base) ? base.slice(0, -1) : base; // running -> run, embedded -> embed
     return true;
   };
-  if (!w.endsWith('eed')) strip('ing', 3) || strip('ed', 3);
+  if (!w.endsWith('eed') && !strip('ing', 3)) strip('ed', 3);
   return w;
 };
 

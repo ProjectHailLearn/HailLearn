@@ -13,6 +13,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import { Mentor } from './models/Mentor.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import presenceRoutes from './routes/presenceRoutes.js';
+import flagRoutes from './routes/flagRoutes.js';
 import { onlineMentorFilter } from './services/presenceService.js';
 import mongoose from 'mongoose';
 import { connectDB } from './config/database.js';
@@ -99,6 +100,7 @@ export const createApp = (): Express => {
   });
   app.use('/api/notifications', notificationRoutes);
   app.use('/api/presence', presenceRoutes);
+  app.use('/api/flags', flagRoutes);
   app.get('/api/stats', protect, getStats);
 
   app.use((_req: Request, res: Response) => {

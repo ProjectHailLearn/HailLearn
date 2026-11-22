@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import {
-  getDoubts, getDoubt, createDoubt, upvoteDoubt, escalateDoubt, answerDoubt, verifyDoubt, closeDoubt,
+  getDoubts, getDoubt, createDoubt, upvoteDoubt, escalateDoubt, resolveWithAi, acceptDoubt, declineDoubt, confirmResolution, answerDoubt, verifyDoubt, closeDoubt,
 } from '../controllers/doubtController.js';
 import { protect, authorize, validateObjectId } from '../middlewares/auth.js';
-import { validate, createDoubtSchema, answerSchema } from '../validators/index.js';
+import { validate, createDoubtSchema, answerSchema, ratingSchema } from '../validators/index.js';
 
 const router = Router();
 router.use(protect);
@@ -14,6 +14,10 @@ router.post('/', validate(createDoubtSchema), createDoubt);
 router.get('/:id', getDoubt);
 router.put('/:id/upvote', upvoteDoubt);
 router.put('/:id/escalate', escalateDoubt);
+router.post('/:id/resolve-ai', resolveWithAi);
+router.post('/:id/accept', authorize('mentor', 'faculty', 'admin'), acceptDoubt);
+router.post('/:id/decline', authorize('mentor', 'faculty', 'admin'), declineDoubt);
+router.post('/:id/confirm', validate(ratingSchema), confirmResolution);
 router.post('/:id/answer', authorize('mentor', 'faculty', 'admin'), validate(answerSchema), answerDoubt);
 router.put('/:id/verify', authorize('faculty', 'admin'), verifyDoubt);
 router.put('/:id/close', closeDoubt);

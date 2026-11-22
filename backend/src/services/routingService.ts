@@ -2,6 +2,7 @@ import { Mentor } from '../models/Mentor.js';
 import { Doubt } from '../models/Doubt.js';
 import { rankDocuments, RetrievableDoc } from './retrievalService.js';
 import { isOnline } from './presenceService.js';
+import { isWithinSlots } from './availabilityService.js';
 import { search } from '../search/engine.js';
 import { ensureIndex } from '../search/indexers.js';
 
@@ -37,8 +38,9 @@ export interface MentorProfile {
   specializations: string[];
   bio: string;
   karmaPoints: number;
-  rating: number;
+  reputationScore: number; // 0-5, from student ratings (services/reputationService.ts)
   online: boolean;
+  available: boolean; // online now, or inside one of their weekly availability slots
   answeredTitles: string[]; // doubts this mentor has answered: their demonstrated expertise
 }
 
@@ -49,14 +51,16 @@ export interface MentorCandidate {
   avatar: string;
   karma: number;
   online: boolean;
+  available: boolean;
   relevance: number; // 0-1 topical match between the doubt and the mentor's expertise
   reputation: number; // 0-1 from rating and karma
   score: number; // 0-1 final rank
 }
 
-// rank = 0.6 × relevance + 0.25 × reputation + 0.15 × online.
-// Relevance dominates; reputation stops a barely-relevant mentor outranking a proven one; being online
-// breaks near-ties in favour of someone who can answer now.
+// rank = 0.6 × relevance + 0.25 × reputation + 0.15 × available.
+// Relevance dominates; reputation stops a barely-relevant mentor outranking a proven one; availability
+// (online now, or inside a weekly slot) breaks near-ties in favour of someone who can answer soon.
+// reputation = 0.6 × (rating-based reputation score / 5) + 0.4 × (karma / highest karma).
 // `relevance` comes from the persisted mentors index when available; otherwise it's computed in memory.
 export const rankMentorProfiles = (
   question: string,
@@ -81,8 +85,8 @@ export const rankMentorProfiles = (
   return mentors
     .map((m) => {
       const rel = relevance.get(m.id) ?? 0;
-      const reputation = 0.5 * Math.min(1, Math.max(0, m.rating / 5)) + 0.5 * (m.karmaPoints / maxKarma);
-      const score = 0.6 * rel + 0.25 * reputation + 0.15 * (m.online ? 1 : 0);
+      const reputation = 0.6 * Math.min(1, Math.max(0, m.reputationScore / 5)) + 0.4 * (m.karmaPoints / maxKarma);
+      const score = 0.6 * rel + 0.25 * reputation + 0.15 * (m.available ? 1 : 0);
       return {
         mentorId: m.id,
         userId: m.userId,
@@ -90,6 +94,7 @@ export const rankMentorProfiles = (
         avatar: m.avatar,
         karma: m.karmaPoints,
         online: m.online,
+        available: m.available,
         relevance: Math.round(rel * 100) / 100,
         reputation: Math.round(reputation * 100) / 100,
         score: Math.round(score * 100) / 100,
@@ -99,8 +104,12 @@ export const rankMentorProfiles = (
 };
 
 // Only mentors with an account can be routed to; seeded profiles without one can't log in to answer.
+// Mentors who paused routed doubts (availability.acceptingDoubts = false) are skipped.
 export const rankMentorsForDoubt = async (question: string, courseCode: string, excludeUserId?: string): Promise<MentorCandidate[]> => {
-  const mentors = await Mentor.find({ userId: { $exists: true, $nin: [null, '', excludeUserId ?? ''] } }).lean();
+  const mentors = await Mentor.find({
+    userId: { $exists: true, $nin: [null, '', excludeUserId ?? ''] },
+    'availability.acceptingDoubts': { $ne: false },
+  }).lean();
   if (!mentors.length) return [];
   const answered = await Doubt.aggregate<{ _id: string; titles: string[] }>([
     { $unwind: '$answers' },
@@ -128,8 +137,9 @@ export const rankMentorsForDoubt = async (question: string, courseCode: string, 
       specializations: m.specializations ?? [],
       bio: m.bio ?? '',
       karmaPoints: m.karmaPoints ?? 0,
-      rating: m.rating ?? 4.5,
+      reputationScore: m.reputationScore ?? 4,
       online: isOnline(m.lastSeenAt),
+      available: isOnline(m.lastSeenAt) || isWithinSlots(m.availability),
       answeredTitles: titlesByUser.get(m.userId as string) ?? [],
     })),
     relevance

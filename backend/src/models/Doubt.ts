@@ -17,7 +17,14 @@ export interface IDoubt extends Document {
   aiConfidenceScore?: number;
   confidenceBreakdown?: { model: number; grounding: number | null; final: number };
   // Knowledge Vault entries retrieved for the AI (RAG); used = the model cited it.
-  retrievedSources?: { id: string; title: string; courseCode: string; match: number; used: boolean }[];
+  retrievedSources?: { id: string; title: string; courseCode: string; match: number; used: boolean; author?: string; doubtId?: string }[];
+  difficulty: 'Easy' | 'Medium' | 'Hard';
+  // Mentor workflow: who accepted the routed/escalated doubt and when (response time for reputation).
+  acceptedBy?: { userId: string; mentorId: string; name: string };
+  acceptedAt?: Date;
+  resolvedAt?: Date;
+  declinedBy: string[]; // mentor user ids who declined; routing skips them
+  rating?: { target: 'mentor' | 'ai'; clarity: number; helpfulness: number; responseTime: number; comment?: string };
   // Confidence gate outcome and the mentors considered (see services/routingService.ts).
   routing?: {
     mode: 'grounded_answer' | 'mentor_routing';
@@ -66,9 +73,15 @@ const DoubtSchema = new Schema<IDoubt>(
     },
     aiConfidenceScore: { type: Number },
     confidenceBreakdown: { type: Schema.Types.Mixed },
+    difficulty: { type: String, enum: ['Easy', 'Medium', 'Hard'], default: 'Medium' },
+    acceptedBy: { type: Schema.Types.Mixed },
+    acceptedAt: { type: Date },
+    resolvedAt: { type: Date },
+    declinedBy: { type: [String], default: [] },
+    rating: { type: Schema.Types.Mixed },
     routing: { type: Schema.Types.Mixed },
     retrievedSources: {
-      type: [{ _id: false, id: String, title: String, courseCode: String, match: Number, used: Boolean }],
+      type: [{ _id: false, id: String, title: String, courseCode: String, match: Number, used: Boolean, author: String, doubtId: String }],
       default: undefined,
     },
     aiSolution: { type: Schema.Types.Mixed },

@@ -3,7 +3,7 @@ import { decideRouting, rankMentorProfiles, MentorProfile, confidenceThreshold }
 
 const mentor = (over: Partial<MentorProfile>): MentorProfile => ({
   id: 'm', userId: 'u', name: 'M', avatar: '', department: 'Computer Science', specializations: [], bio: '',
-  karmaPoints: 0, rating: 4.5, online: false, answeredTitles: [], ...over,
+  karmaPoints: 0, reputationScore: 4, online: false, available: false, answeredTitles: [], ...over,
 });
 
 describe('confidence gate', () => {
@@ -47,8 +47,8 @@ describe('mentor ranking', () => {
     expect(top.mentorId).toBe('exp');
   });
 
-  it('prefers the online mentor when relevance and reputation tie', () => {
-    const ranked = rankMentorProfiles('SQL indexing', 'CS245', [dbs, { ...dbs, id: 'dbs-online', online: true }]);
+  it('prefers the available mentor when relevance and reputation tie', () => {
+    const ranked = rankMentorProfiles('SQL indexing', 'CS245', [dbs, { ...dbs, id: 'dbs-online', online: true, available: true }]);
     expect(ranked[0].mentorId).toBe('dbs-online');
     expect(ranked[0].score - ranked[1].score).toBeCloseTo(0.15);
   });

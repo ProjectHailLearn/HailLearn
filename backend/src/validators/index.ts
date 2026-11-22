@@ -51,6 +51,35 @@ export const createDoubtSchema = z.object({
   courseCode: z.string().trim().min(2).max(20),
   tags: z.array(z.string().max(40)).max(10).optional(),
   depth: z.enum(['detailed', 'concise', 'socratic']).optional(),
+  difficulty: z.enum(['Easy', 'Medium', 'Hard']).optional(),
+});
+
+const stars = z.coerce.number().int().min(1, 'must be 1-5').max(5, 'must be 1-5');
+export const ratingSchema = z.object({
+  clarity: stars,
+  helpfulness: stars,
+  responseTime: stars,
+  comment: z.string().trim().max(1000).optional(),
+});
+
+const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'must be HH:MM');
+export const availabilitySchema = z.object({
+  acceptingDoubts: z.boolean(),
+  timezone: z.string().trim().min(1).max(60).refine((tz) => {
+    try { new Intl.DateTimeFormat('en-US', { timeZone: tz }); return true; } catch { return false; }
+  }, 'must be a valid IANA timezone'),
+  slots: z.array(z.object({ day: z.number().int().min(0).max(6), start: hhmm, end: hhmm }).refine((s) => s.start !== s.end, 'start and end must differ')).max(28),
+});
+
+export const suspendSchema = z.object({ reason: z.string().trim().max(300).optional() });
+export const badgeSchema = z.object({ verified: z.boolean() });
+export const resolveFlagSchema = z.object({ action: z.enum(['dismiss', 'remove']) });
+const objectId = z.string().regex(/^[a-f\d]{24}$/i, 'must be a valid id');
+export const flagSchema = z.object({
+  targetType: z.enum(['doubt', 'answer', 'message', 'knowledge']),
+  targetId: objectId,
+  parentId: objectId.optional(),
+  reason: z.string().trim().min(3, 'is required').max(500),
 });
 
 export const answerSchema = z.object({
