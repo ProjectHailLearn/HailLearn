@@ -9,6 +9,7 @@ import { courseService } from '../../services/courseService';
 import { Course, Doubt } from '../../types';
 import { useNavigate } from 'react-router-dom';
 import { RagSources } from '../doubts/RagSources';
+import { RoutingBanner } from '../doubts/RoutingBanner';
 
 export const QuickAskCard: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -82,11 +83,12 @@ export const QuickAskCard: React.FC = () => {
 
           {answer.aiSolution ? (
             <>
+              <RoutingBanner routing={answer.routing} confidence={answer.aiConfidenceScore} />
               <div className="p-4 rounded-xl bg-brand-950/40 border border-brand-500/30 text-sm text-slate-200 leading-relaxed">
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <strong className="text-brand-300 flex items-center gap-1.5">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    AI Answer
+                    {answer.routing?.mode === 'mentor_routing' ? 'AI Draft' : 'AI Answer'}
                   </strong>
                   {answer.aiConfidenceScore != null && (
                     <span className="text-[11px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30">

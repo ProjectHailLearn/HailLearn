@@ -29,6 +29,7 @@ const DEPTH_INSTRUCTIONS: Record<NonNullable<SolveInput['depth']>, string> = {
 export interface ConfidenceBreakdown {
   model: number; // the model's self-rating against the rubric in the prompt
   grounding: number | null; // best match (0-100) among vault sources the model actually used; null if none
+  missingContext?: string[]; // information the model said it needed but was not given (caps the self-rating)
   final: number;
 }
 
@@ -44,7 +45,10 @@ const CONFIDENCE_RUBRIC = `Rate "confidence" (0-100) honestly with this rubric:
 - 90-100: standard, well-established material; you are certain the answer is correct and complete.
 - 70-89: correct in substance but relies on assumptions, simplifications, or the question is slightly ambiguous.
 - 50-69: the question is ambiguous, missing information, or the answer depends on course-specific context you lack.
-- below 50: you are unsure, the question is outside your knowledge, or it cannot be answered as asked.`;
+- below 50: you are unsure, the question is outside your knowledge, or it cannot be answered as asked.
+In "missingContext", list each specific piece of information you needed but were not given, e.g. code, a query,
+an error message, or the assignment/lab text the student refers to ("my query", "question 3", "this error").
+Use [] only if the question is fully answerable as written.`;
 
 const contextBlock = (sources: RetrievedSource[]): string =>
   sources.length
@@ -60,7 +64,7 @@ ${sources
 
 export const buildPrompt = (input: SolveInput): string => `You are HailLearn, an expert university tutor for ${input.subject} (${input.courseCode}).
 Solve the student's doubt step by step. Respond ONLY with JSON (no markdown fences) of this exact shape:
-{"summary": string, "confidence": number (0-100), "usedSources": string[] (e.g. ["K1"]; [] if none), "steps": [{"step": number, "title": string, "content": string, "codeSnippet"?: string, "language"?: string}], "citations": string[], "suggestedReadings": string[]}
+{"summary": string, "confidence": number (0-100), "usedSources": string[] (e.g. ["K1"]; [] if none), "missingContext": string[], "steps": [{"step": number, "title": string, "content": string, "codeSnippet"?: string, "language"?: string}], "citations": string[], "suggestedReadings": string[]}
 ${DEPTH_INSTRUCTIONS[input.depth || 'detailed']}
 ${CONFIDENCE_RUBRIC}
 
@@ -68,13 +72,19 @@ ${contextBlock(input.sources ?? [])}Title: ${input.title}
 Question: ${input.description}
 ${input.codeSnippet ? `Code:\n${input.codeSnippet}` : ''}`;
 
-// Final score: an answer backed by vault sources blends the model's self-rating (75%) with how well those
+// Models overrate themselves, so a self-rating is capped at 60 whenever the model admits it was missing
+// information. 60 is inside the rubric's "missing information" band and below the routing threshold.
+export const MISSING_CONTEXT_CAP = 60;
+
+// Final score: an answer backed by vault sources blends the (capped) self-rating (75%) with how well those
 // sources match the question (25%). An unbacked answer keeps the self-rating but is capped at 90, since
 // nothing institutional confirms it.
-export const scoreConfidence = (model: number, usedSources: RetrievedSource[]): ConfidenceBreakdown => {
-  if (!usedSources.length) return { model, grounding: null, final: Math.min(model, 90) };
+export const scoreConfidence = (rawModel: number, usedSources: RetrievedSource[], missingContext: string[] = []): ConfidenceBreakdown => {
+  const model = missingContext.length ? Math.min(rawModel, MISSING_CONTEXT_CAP) : rawModel;
+  const extra = missingContext.length ? { missingContext } : {};
+  if (!usedSources.length) return { model, grounding: null, ...extra, final: Math.min(model, 90) };
   const grounding = Math.round(Math.max(...usedSources.map((s) => s.match)) * 100);
-  return { model, grounding, final: Math.round(0.75 * model + 0.25 * grounding) };
+  return { model, grounding, ...extra, final: Math.round(0.75 * model + 0.25 * grounding) };
 };
 
 const fallbackSolution = (input: SolveInput): SolveResult => ({
@@ -117,7 +127,7 @@ const extractJson = (text: string): unknown => {
   return JSON.parse(cleaned.slice(start, end + 1));
 };
 
-const normalize = (raw: unknown): { solution: AiSolution; confidence: number; usedSources: string[] } | null => {
+const normalize = (raw: unknown): { solution: AiSolution; confidence: number; usedSources: string[]; missingContext: string[] } | null => {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   if (typeof r.summary !== 'string' || !Array.isArray(r.steps)) return null;
@@ -135,6 +145,7 @@ const normalize = (raw: unknown): { solution: AiSolution; confidence: number; us
     solution: { summary: r.summary, steps, citations: strings(r.citations), suggestedReadings: strings(r.suggestedReadings) },
     confidence,
     usedSources: strings(r.usedSources),
+    missingContext: strings(r.missingContext).map((m) => m.trim()).filter(Boolean).slice(0, 5),
   };
 };
 
@@ -224,7 +235,7 @@ export const solveDoubt = async (input: SolveInput): Promise<SolveResult> => {
     const used = [...new Set(parsed.usedSources)]
       .map((label) => sources[Number(label.replace(/\D/g, '')) - 1])
       .filter((s): s is RetrievedSource => !!s);
-    const confidence = scoreConfidence(parsed.confidence, used);
+    const confidence = scoreConfidence(parsed.confidence, used, parsed.missingContext);
     return {
       aiSolution: parsed.solution,
       aiConfidenceScore: confidence.final,

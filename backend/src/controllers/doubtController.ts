@@ -6,6 +6,7 @@ import { KnowledgeItem } from '../models/KnowledgeItem.js';
 import { AuthRequest } from '../middlewares/auth.js';
 import { solveDoubt } from '../services/aiService.js';
 import { retrieveForQuestion } from '../services/retrievalService.js';
+import { decideRouting, rankMentorsForDoubt } from '../services/routingService.js';
 import { notify } from '../services/notificationService.js';
 import { knowledgeContentFromDoubt } from '../utils/knowledge.js';
 
@@ -62,6 +63,16 @@ export const createDoubt = async (req: AuthRequest, res: Response): Promise<void
       sources,
     });
 
+    // Confidence gate: a confident AI answer resolves the doubt; otherwise it goes to the best-matching mentor.
+    const decision = decideRouting(aiConfidenceScore, source !== 'fallback');
+    const candidates = decision.mode === 'mentor_routing'
+      ? await rankMentorsForDoubt(`${title}\n${description}`, courseCode, user._id.toString()).catch((err) => {
+          console.error('[routing] mentor ranking failed:', (err as Error).message);
+          return [];
+        })
+      : [];
+    const routedTo = candidates[0];
+
     const doubt = await Doubt.create({
       title,
       description,
@@ -69,8 +80,12 @@ export const createDoubt = async (req: AuthRequest, res: Response): Promise<void
       subject,
       courseCode,
       tags: Array.isArray(tags) && tags.length ? tags : [subject.split(' ')[0], courseCode],
-      status: 'AI_RESOLVED',
+      status: routedTo ? 'MENTOR_ESCALATED' : 'AI_RESOLVED',
       author: { id: user._id.toString(), name: user.name, avatar: user.avatar, department: user.department },
+      assignedMentor: routedTo
+        ? { id: routedTo.mentorId, name: routedTo.name, avatar: routedTo.avatar, karma: routedTo.karma }
+        : undefined,
+      routing: { ...decision, candidates: candidates.slice(0, 3), routedAt: routedTo ? new Date() : undefined },
       aiSolution,
       aiConfidenceScore,
       confidenceBreakdown: confidence ?? undefined,
@@ -82,12 +97,28 @@ export const createDoubt = async (req: AuthRequest, res: Response): Promise<void
     });
 
     await User.findByIdAndUpdate(user._id, { $inc: { karmaPoints: 2 } });
-    await notify(user._id.toString(), {
-      type: 'ai',
-      title: source === 'fallback' ? 'Doubt received' : 'AI solved your doubt',
-      message: `"${title}" — ${source === 'fallback' ? 'a guided outline is ready; escalate for a mentor answer.' : `solution ready (${aiConfidenceScore}% confidence).`}`,
-      link: `/doubts?id=${doubt._id}`,
-    });
+    const link = `/doubts?id=${doubt._id}`;
+    if (routedTo) {
+      await notify(routedTo.userId, {
+        type: 'mentor',
+        title: 'New doubt routed to you',
+        message: `"${title}" (${courseCode}) needs a mentor — the AI was ${decision.reason === 'ai_unavailable' ? 'unavailable' : `only ${aiConfidenceScore}% confident`}.`,
+        link,
+      });
+      await notify(user._id.toString(), {
+        type: 'mentor',
+        title: 'Routed to a mentor',
+        message: `"${title}" was sent to ${routedTo.name}. The AI draft is shown meanwhile.`,
+        link,
+      });
+    } else {
+      await notify(user._id.toString(), {
+        type: 'ai',
+        title: source === 'fallback' ? 'Doubt received' : 'AI solved your doubt',
+        message: `"${title}" — ${source === 'fallback' ? 'a guided outline is ready; escalate for a mentor answer.' : `solution ready (${aiConfidenceScore}% confidence).`}`,
+        link,
+      });
+    }
 
     res.status(201).json({ success: true, data: doubt });
   } catch (err) {

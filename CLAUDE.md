@@ -69,7 +69,9 @@ Mongoose models (also `Course`, `StudyRoom`, `MentorRequest`, `Notification`):
 - **KnowledgeItem** — verified community answers (`content` = full article, `doubtId` = source doubt); tracks upvotes, views
 
 ### RAG & confidence
-`services/retrievalService.ts` ranks Knowledge Vault entries with in-process BM25 (no embedding API; the configured Gemini key can't call embedding models). `createDoubt` retrieves up to 3 entries covering ≥30% of the question's terms, `aiService.buildPrompt` passes them as `[K1]…` context, and the model returns `usedSources`. `scoreConfidence`: with cited sources, final = 0.75 × model self-rating + 0.25 × best cited match; otherwise the self-rating capped at 90. Doubts store `retrievedSources` and `confidenceBreakdown`; vault search uses the same ranking.
+`services/retrievalService.ts` ranks Knowledge Vault entries with in-process BM25 (no embedding API; the configured Gemini key can't call embedding models). `createDoubt` retrieves up to 3 entries covering ≥30% of the question's terms, `aiService.buildPrompt` passes them as `[K1]…` context, and the model returns `usedSources`. `scoreConfidence`: with cited sources, final = 0.75 × model self-rating + 0.25 × best cited match; otherwise the self-rating capped at 90. If the model lists `missingContext`, its self-rating is capped at 60 first. Doubts store `retrievedSources` and `confidenceBreakdown`; vault search uses the same ranking.
+
+**Confidence gate** (`services/routingService.ts`): a final score above `CONFIDENCE_THRESHOLD` (default 70) keeps the doubt `AI_RESOLVED`; otherwise, or when the AI is unavailable, it is assigned (`MENTOR_ESCALATED`) to the top-ranked mentor with an account: rank = 0.6 × BM25 match against specializations/bio/answered doubts + 0.25 × reputation (rating + karma) + 0.15 × online. The decision and top 3 candidates are stored in `doubt.routing`.
 
 ### API Surface
 See the API Reference table in `README.md`. Tests (`backend/src/tests/`, Jest + supertest) cover only paths that don't need MongoDB.

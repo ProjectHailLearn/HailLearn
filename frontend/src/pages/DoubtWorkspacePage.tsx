@@ -25,6 +25,7 @@ import { courseService } from '../services/courseService';
 import { Mentor, Course, DoubtStatus } from '../types';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { RagSources } from '../components/doubts/RagSources';
+import { RoutingBanner } from '../components/doubts/RoutingBanner';
 
 const errorMessage = (err: unknown, fallback: string): string =>
   (err as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback;
@@ -389,6 +390,7 @@ export const DoubtWorkspacePage: React.FC = () => {
 
               {activeDoubt.aiSolution ? (
                 <div className="space-y-5">
+                  <RoutingBanner routing={activeDoubt.routing} confidence={activeDoubt.aiConfidenceScore} />
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">

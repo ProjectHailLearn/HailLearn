@@ -18,6 +18,14 @@ export interface IDoubt extends Document {
   confidenceBreakdown?: { model: number; grounding: number | null; final: number };
   // Knowledge Vault entries retrieved for the AI (RAG); used = the model cited it.
   retrievedSources?: { id: string; title: string; courseCode: string; match: number; used: boolean }[];
+  // Confidence gate outcome and the mentors considered (see services/routingService.ts).
+  routing?: {
+    mode: 'grounded_answer' | 'mentor_routing';
+    reason: 'confident' | 'low_confidence' | 'ai_unavailable';
+    threshold: number;
+    candidates: { mentorId: string; userId: string; name: string; avatar: string; karma: number; online: boolean; relevance: number; reputation: number; score: number }[];
+    routedAt?: Date;
+  };
   aiSolution?: {
     summary: string;
     steps: { step: number; title: string; content: string; codeSnippet?: string; language?: string }[];
@@ -58,6 +66,7 @@ const DoubtSchema = new Schema<IDoubt>(
     },
     aiConfidenceScore: { type: Number },
     confidenceBreakdown: { type: Schema.Types.Mixed },
+    routing: { type: Schema.Types.Mixed },
     retrievedSources: {
       type: [{ _id: false, id: String, title: String, courseCode: String, match: Number, used: Boolean }],
       default: undefined,

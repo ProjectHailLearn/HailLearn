@@ -54,6 +54,7 @@ function toDoubt(d: Record<string, unknown>): Doubt {
     aiConfidenceScore: d.aiConfidenceScore as number | undefined,
     confidenceBreakdown: d.confidenceBreakdown as Doubt['confidenceBreakdown'] | undefined,
     retrievedSources: (d.retrievedSources as Doubt['retrievedSources']) || [],
+    routing: d.routing as Doubt['routing'] | undefined,
     aiSolution: d.aiSolution as Doubt['aiSolution'] | undefined,
     assignedMentor: d.assignedMentor as Doubt['assignedMentor'] | undefined,
     answers: (d.answers as Doubt['answers']) || [],

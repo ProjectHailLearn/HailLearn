@@ -34,6 +34,7 @@ export interface AIReasoningStep {
 export interface ConfidenceBreakdown {
   model: number;
   grounding: number | null;
+  missingContext?: string[];
   final: number;
 }
 
@@ -44,6 +45,14 @@ export interface RetrievedSource {
   courseCode: string;
   match: number;
   used: boolean;
+}
+
+// Confidence-gate outcome for a doubt (see backend services/routingService.ts).
+export interface RoutingDecision {
+  mode: 'grounded_answer' | 'mentor_routing';
+  reason: 'confident' | 'low_confidence' | 'ai_unavailable';
+  threshold: number;
+  candidates: { mentorId: string; name: string; online: boolean; relevance: number; reputation: number; score: number }[];
 }
 
 export interface Doubt {
@@ -64,6 +73,7 @@ export interface Doubt {
   aiConfidenceScore?: number;
   confidenceBreakdown?: ConfidenceBreakdown;
   retrievedSources?: RetrievedSource[];
+  routing?: RoutingDecision;
   aiSolution?: {
     summary: string;
     steps: AIReasoningStep[];

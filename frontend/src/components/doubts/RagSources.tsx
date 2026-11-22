@@ -33,6 +33,9 @@ export const RagSources: React.FC<{ sources?: RetrievedSource[]; confidence?: Co
           {confidence.grounding !== null
             ? <>Confidence {confidence.final}% = 75% × AI self-rating ({confidence.model}) + 25% × best cited source match ({confidence.grounding}).</>
             : <>Confidence {confidence.final}% = AI self-rating ({confidence.model}){confidence.model > 90 ? ', capped at 90 because no vault source backs it' : ''}.</>}
+          {confidence.missingContext?.length ? (
+            <> The self-rating was capped at 60 because the question is missing: {confidence.missingContext.join('; ')}.</>
+          ) : null}
         </span>
       </div>
     )}
